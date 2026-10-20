@@ -1,0 +1,39 @@
+import OBR from "@owlbear-rodeo/sdk";
+import { CHANNEL, isGalleryMessage, VIEWER_POPOVER_ID } from "./protocol";
+
+OBR.onReady(() => {
+  OBR.broadcast.onMessage(CHANNEL, async (event) => {
+    if (!isGalleryMessage(event.data)) return;
+    const message = event.data;
+
+    try {
+      if (message.type === "HIDE") {
+        await OBR.popover.close(VIEWER_POPOVER_ID);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        url: message.image.url,
+        title: message.image.title,
+        description: message.image.description ?? message.image.category
+      });
+
+      await OBR.popover.close(VIEWER_POPOVER_ID).catch(() => undefined);
+      await OBR.popover.open({
+        id: VIEWER_POPOVER_ID,
+        url: `/viewer.html?${params.toString()}`,
+        width: 360,
+        height: 520,
+        anchorReference: "POSITION",
+        // MVP placement: adjust these coordinates if the panel appears in an awkward place.
+        // Owlbear's popover API positions relative to the app viewport.
+        anchorPosition: { left: 1180, top: 420 },
+        anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
+        transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
+        disableClickAway: true
+      });
+    } catch (error) {
+      console.error("Image Gallery: could not update viewer", error);
+    }
+  });
+});
