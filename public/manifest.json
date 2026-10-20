@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "manifest_version": 1,
   "description": "Компактна галерея майстра для показу зображень учасникам кімнати.",
-  "icon": "/owlbear-image-gallery-sidebar/icon.svg",
+  "icon": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/icon.svg",
   "action": {
     "title": "Галерея зображень",
-    "icon": "/owlbear-image-gallery-sidebar/icon.svg",
-    "popover": "/owlbear-image-gallery-sidebar/",
+    "icon": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/icon.svg",
+    "popover": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/",
     "width": 380,
     "height": 640
   },
-  "background_url": "/owlbear-image-gallery-sidebar/background.html"
+  "background_url": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/background.html"
 }
