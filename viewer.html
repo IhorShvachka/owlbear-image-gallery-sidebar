@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Зображення для гравців</title>
+  </head>
+  <body>
+    <main class="viewer">
+      <header class="viewer-header">
+        <div class="viewer-heading">
+          <span class="live-dot"></span>
+          <span id="viewer-title">Зображення</span>
+        </div>
+        <button id="close-viewer" class="close-button" title="Закрити на цьому пристрої" aria-label="Закрити">×</button>
+      </header>
+      <div class="image-frame">
+        <img id="viewer-image" alt="" />
+        <div id="image-error" class="image-error" hidden>Не вдалося завантажити зображення. Перевір доступність URL для всіх учасників.</div>
+      </div>
+      <p id="viewer-caption" class="viewer-caption"></p>
+      <footer>Показує майстер гри</footer>
+    </main>
+    <script type="module" src="/src/viewer.ts"></script>
+  </body>
+</html>

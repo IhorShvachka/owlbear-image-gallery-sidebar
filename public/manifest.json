@@ -1,0 +1,15 @@
+{
+  "name": "Image Gallery",
+  "version": "0.1.0",
+  "manifest_version": 1,
+  "description": "Компактна галерея майстра для показу зображень учасникам кімнати.",
+  "icon": "/owlbear-image-gallery-sidebar/icon.svg",
+  "action": {
+    "title": "Галерея зображень",
+    "icon": "/owlbear-image-gallery-sidebar/icon.svg",
+    "popover": "/owlbear-image-gallery-sidebar/",
+    "width": 380,
+    "height": 640
+  },
+  "background_url": "/owlbear-image-gallery-sidebar/background.html"
+}
