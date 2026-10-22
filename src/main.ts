@@ -478,9 +478,18 @@ render();
 
 OBR.onReady(async () => {
   try {
+    // Check the current role directly, then cross-check the current player in the party list.
+    // This avoids incorrectly blocking the GM if the role response is temporarily stale.
     const role = await OBR.player.getRole();
-    if (role !== "GM") {
-      app.innerHTML = '<div class="access-denied"><strong>Галерея майстра</strong><p>Цей інструмент доступний лише майстру кімнати.</p></div>';
+    let isGM = role === "GM";
+    if (!isGM) {
+      const currentPlayerId = OBR.player.id;
+      const party = await OBR.party.getPlayers();
+      isGM = party.some((player) => player.id === currentPlayerId && player.role === "GM");
+    }
+    if (!isGM) {
+      const playerName = await OBR.player.getName().catch(() => "невідомий учасник");
+      app.innerHTML = `<div class="access-denied"><strong>Галерея майстра</strong><p>Owlbear Rodeo повідомляє, що поточний профіль «${playerName.replace(/[&<>"]/g, "")}» не має ролі майстра (отримана роль: ${String(role)}).</p><p>Переконайся, що відкрито правильну кімнату та профіль.</p></div>`;
       return;
     }
     const metadata = await OBR.room.getMetadata();
