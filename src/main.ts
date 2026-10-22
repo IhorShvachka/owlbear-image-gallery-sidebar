@@ -301,20 +301,34 @@ $("#select-none").addEventListener("click", () => {
 
 $("#choose-asset").addEventListener("click", async () => {
   try {
+    // SDK відкриває вибір активів; API не надає прямого списку всієї бібліотеки.
     const assets = await OBR.assets.downloadImages(true, "", "PROP");
     if (!assets.length) {
       status.textContent = "Зображення не вибрано.";
       return;
     }
-    const asset = assets[0];
-    titleInput.value = asset.name;
-    categoryInput.value = "Asset Manager";
-    urlInput.value = asset.image.url;
-    descriptionInput.value = asset.description ?? "";
-    status.textContent = `Обрано «${asset.name}». Заповни решту полів і натисни «Зберегти».`;
+    const existingUrls = new Set(catalog.map((image) => image.url));
+    const imported: GalleryImage[] = assets
+      .filter((asset) => asset.image?.url && !existingUrls.has(asset.image.url))
+      .map((asset) => ({
+        id: crypto.randomUUID(),
+        title: asset.name || "Зображення",
+        category: asset.type || "Asset Manager",
+        url: asset.image.url,
+        description: asset.description ?? ""
+      }));
+    if (!imported.length) {
+      status.textContent = "Усі вибрані зображення вже є в каталозі.";
+      return;
+    }
+    catalog = [...imported, ...catalog];
+    selectedId = imported[0].id;
+    await persistCatalog();
+    render();
+    status.textContent = "Додано з Asset Manager: " + imported.length + " зображень.";
   } catch (error) {
     console.error(error);
-    status.textContent = "Не вдалося відкрити Asset Manager.";
+    status.textContent = "Не вдалося імпортувати зображення з Asset Manager.";
   }
 });
 
@@ -413,10 +427,15 @@ OBR.onReady(async () => {
     const metadata = await OBR.room.getMetadata();
     const saved = metadata[STORAGE_KEY];
     if (Array.isArray(saved)) {
+      const sampleIds = new Set([
+        "mysterious-stranger", "ancient-relic", "old-map",
+        "dark-forest", "stormy-sea", "ancient-door"
+      ]);
       catalog = saved.filter((item): item is GalleryImage =>
         !!item &&
         typeof item === "object" &&
         typeof (item as GalleryImage).id === "string" &&
+        !sampleIds.has((item as GalleryImage).id) &&
         typeof (item as GalleryImage).title === "string" &&
         typeof (item as GalleryImage).category === "string" &&
         typeof (item as GalleryImage).url === "string"
