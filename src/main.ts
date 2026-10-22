@@ -276,7 +276,7 @@ $("#delete-folder").addEventListener("click", async () => {
   folders = folders.filter((folder) => folder !== target && !folder.startsWith(target + "/"));
   catalog = catalog.map((image) => {
     if (image.folder !== target && !(image.folder ?? "").startsWith(target + "/")) return image;
-    const suffix = (image.folder ?? "").slice(target.length).replace(/^\\//, "");
+    const suffix = (image.folder ?? "").slice(target.length).replace(/^\/+/, "");
     return { ...image, folder: parent ? (suffix ? parent + "/" + suffix : parent) : (suffix || undefined) };
   });
   selectedFolder = parent || "Усі папки";
