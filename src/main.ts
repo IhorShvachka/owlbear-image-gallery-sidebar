@@ -46,7 +46,6 @@ app.innerHTML = `
   <section class="editor">
     <div class="section-row"><span id="editor-heading">ДОДАТИ ЗОБРАЖЕННЯ</span></div>
     <label class="field-label">Назва<input id="title-input" maxlength="100" placeholder="Наприклад, Таємничий храм"></label>
-    <label class="field-label">Категорія<input id="category-input" maxlength="60" placeholder="Локації, NPC, Предмети…"></label>
     <label class="field-label">URL зображення<input id="url-input" type="url" placeholder="https://…"></label>
     <label class="field-label">Опис (необов’язково)<textarea id="description-input" rows="2" maxlength="500" placeholder="Короткий опис"></textarea></label>
     <label class="field-label">Папка<select id="image-folder"><option value="">Без папки</option></select></label>
@@ -85,7 +84,6 @@ const searchInput = $<HTMLInputElement>("#search");
 const count = $("#count");
 const status = $("#status");
 const titleInput = $<HTMLInputElement>("#title-input");
-const categoryInput = $<HTMLInputElement>("#category-input");
 const urlInput = $<HTMLInputElement>("#url-input");
 const descriptionInput = $<HTMLTextAreaElement>("#description-input");
 const folderInput = $<HTMLSelectElement>("#image-folder");
@@ -110,7 +108,7 @@ function filteredImages(): GalleryImage[] {
   const needle = query.trim().toLocaleLowerCase("uk");
   return catalog.filter((image) => {
     const matchesFolder = selectedFolder === "Усі папки" || (image.folder ?? "") === selectedFolder;
-    const matchesQuery = `${image.title} ${image.category} ${image.description ?? ""} ${image.folder ?? ""}`.toLocaleLowerCase("uk").includes(needle);
+    const matchesQuery = `${image.title} ${image.description ?? ""} ${image.folder ?? ""}`.toLocaleLowerCase("uk").includes(needle);
     return matchesFolder && matchesQuery;
   });
 }
@@ -157,7 +155,7 @@ function render(): void {
   const image = getSelected();
   preview.innerHTML = image
     ? `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}">
-       <div class="preview-copy"><span class="preview-label">ВИБРАНО</span><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description ?? image.category)}</span></div>`
+       <div class="preview-copy"><span class="preview-label">ВИБРАНО</span><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description ?? "")}</span></div>`
     : `<div class="empty">Додай зображення або обери його в каталозі.</div>`;
 
   $("#show").toggleAttribute("disabled", !image || selectedRecipients.size === 0);
@@ -178,7 +176,6 @@ function renderPlayers(): void {
 function resetEditor(): void {
   editingId = null;
   titleInput.value = "";
-  categoryInput.value = "";
   urlInput.value = "";
   descriptionInput.value = "";
   folderInput.value = "";
@@ -192,7 +189,6 @@ function editImage(id: string): void {
   if (!image) return;
   editingId = id;
   titleInput.value = image.title;
-  categoryInput.value = image.category;
   urlInput.value = image.url;
   descriptionInput.value = image.description ?? "";
   folderInput.value = image.folder ?? "";
@@ -289,7 +285,6 @@ $("#create-folder").addEventListener("click", () => {
 
 saveButton.addEventListener("click", async () => {
   const title = titleInput.value.trim() || "Без назви";
-  const category = categoryInput.value.trim() || "Без категорії";
   const url = urlInput.value.trim();
   const description = descriptionInput.value.trim();
   const folder = folderInput.value;
@@ -308,13 +303,13 @@ saveButton.addEventListener("click", async () => {
 
   if (editingId) {
     catalog = catalog.map((image) => image.id === editingId
-      ? { ...image, title, category, url, description, folder: folder || undefined }
+      ? { ...image, title, url, description, folder: folder || undefined }
       : image);
     selectedId = editingId;
   } else {
     const image: GalleryImage = {
       id: crypto.randomUUID(),
-      title, category, url, description, folder: folder || undefined
+      title, url, description, folder: folder || undefined
     };
     catalog.unshift(image);
     selectedId = image.id;
@@ -507,7 +502,6 @@ OBR.onReady(async () => {
         typeof (item as GalleryImage).id === "string" &&
         !sampleIds.has((item as GalleryImage).id) &&
         typeof (item as GalleryImage).title === "string" &&
-        typeof (item as GalleryImage).category === "string" &&
         typeof (item as GalleryImage).url === "string"
       );
       selectedId = catalog[0]?.id ?? "";
