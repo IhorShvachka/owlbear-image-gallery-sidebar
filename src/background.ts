@@ -1,6 +1,8 @@
 import OBR from "@owlbear-rodeo/sdk";
 import { CHANNEL, isGalleryMessage, VIEWER_POPOVER_ID } from "./protocol";
 
+const BASE_URL = "/owlbear-image-gallery-sidebar/";
+
 OBR.onReady(() => {
   OBR.broadcast.onMessage(CHANNEL, async (event) => {
     if (!isGalleryMessage(event.data)) return;
@@ -21,12 +23,10 @@ OBR.onReady(() => {
       await OBR.popover.close(VIEWER_POPOVER_ID).catch(() => undefined);
       await OBR.popover.open({
         id: VIEWER_POPOVER_ID,
-        url: `/viewer.html?${params.toString()}`,
+        url: `${BASE_URL}viewer.html?${params.toString()}`,
         width: 360,
         height: 520,
         anchorReference: "POSITION",
-        // MVP placement: adjust these coordinates if the panel appears in an awkward place.
-        // Owlbear's popover API positions relative to the app viewport.
         anchorPosition: { left: 1180, top: 420 },
         anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
         transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
