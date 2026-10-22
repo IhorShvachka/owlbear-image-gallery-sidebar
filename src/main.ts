@@ -46,7 +46,7 @@ app.innerHTML = `
       <button id="cancel-edit" class="secondary" hidden>Скасувати</button>
     </div>
     <div class="actions">
-      <button id="choose-asset" class="secondary">Вибрати з Asset Manager</button>
+      <button id="choose-asset" class="secondary">Імпортувати з Asset Manager</button>
       <button id="upload-local" class="secondary">Імпортувати файл</button>
       <input id="file-input" type="file" accept="image/*" multiple hidden>
     </div>
