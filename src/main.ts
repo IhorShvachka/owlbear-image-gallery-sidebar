@@ -31,13 +31,13 @@ app.innerHTML = `
 
   <label class="search-wrap">
     <span aria-hidden="true">⌕</span>
-    <input id="search" type="search" placeholder="Пошук назви, опису або категорії…" autocomplete="off" />
+    <input id="search" type="search" placeholder="Пошук назви або опису…" autocomplete="off" />
   </label>
 
   <div class="folder-controls">
     <select id="folder-filter" aria-label="Фільтр папок"><option>Усі папки</option></select>
     <input id="new-folder" maxlength="60" placeholder="Назва нової папки">
-    <button id="create-folder" class="secondary">Створити</button>
+    <button id="create-folder" class="secondary">Створити</button><button id="delete-folder" class="secondary danger">Видалити папку</button>
   </div>
   <div class="section-row"><span>КАТАЛОГ</span><span id="count" class="count"></span></div>
   <div id="gallery" class="gallery"></div>
@@ -107,8 +107,8 @@ function getSelected(): GalleryImage | undefined {
 function filteredImages(): GalleryImage[] {
   const needle = query.trim().toLocaleLowerCase("uk");
   return catalog.filter((image) => {
-    const matchesFolder = selectedFolder === "Усі папки" || (image.folder ?? "") === selectedFolder;
-    const matchesQuery = `${image.title} ${image.description ?? ""} ${image.folder ?? ""}`.toLocaleLowerCase("uk").includes(needle);
+    const matchesFolder = selectedFolder === "Усі папки" || (image.folder ?? "") === selectedFolder || (image.folder ?? "").startsWith(selectedFolder + "/");
+    const matchesQuery = `${image.title} ${image.description ?? ""}`.toLocaleLowerCase("uk").includes(needle);
     return matchesFolder && matchesQuery;
   });
 }
@@ -143,7 +143,7 @@ function render(): void {
       <button class="tile ${image.id === selectedId ? "selected" : ""}" data-id="${escapeHtml(image.id)}" aria-pressed="${image.id === selectedId}">
         <img src="${escapeHtml(image.url)}" alt="" loading="lazy">
         <span class="tile-title">${escapeHtml(image.title)}</span>
-        <span class="tile-category">${escapeHtml(image.category || "Без категорії")}${image.folder ? " · 📁 " + escapeHtml(image.folder) : ""}</span>
+        <span class="tile-category">${image.folder ? "📁 " + escapeHtml(image.folder) : "Без папки"}</span>
       </button>
       <div class="tile-tools">
         <button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button>
@@ -262,6 +262,32 @@ searchInput.addEventListener("input", () => {
 folderFilter.addEventListener("change", () => {
   selectedFolder = folderFilter.value;
   render();
+});
+
+$("#delete-folder").addEventListener("click", async () => {
+  const target = selectedFolder;
+  if (target === "Усі папки" || !folders.includes(target)) {
+    status.textContent = "Спочатку обери папку для видалення.";
+    return;
+  }
+  const parent = target.includes("/") ? target.slice(0, target.lastIndexOf("/")) : "";
+  const affected = catalog.filter((image) => image.folder === target || (image.folder ?? "").startsWith(target + "/")).length;
+  if (!confirm(`Видалити папку «${target}» і всі її вкладені папки? Зображень: ${affected}. Зображення буде переміщено до батьківської папки або без папки.`)) return;
+  folders = folders.filter((folder) => folder !== target && !folder.startsWith(target + "/"));
+  catalog = catalog.map((image) => {
+    if (image.folder !== target && !(image.folder ?? "").startsWith(target + "/")) return image;
+    const suffix = (image.folder ?? "").slice(target.length).replace(/^\\//, "");
+    return { ...image, folder: parent ? (suffix ? parent + "/" + suffix : parent) : (suffix || undefined) };
+  });
+  selectedFolder = parent || "Усі папки";
+  try {
+    await persistCatalog();
+    render();
+    status.textContent = "Папку видалено.";
+  } catch (error) {
+    console.error(error);
+    status.textContent = "Не вдалося зберегти видалення папки.";
+  }
 });
 
 $("#create-folder").addEventListener("click", () => {
