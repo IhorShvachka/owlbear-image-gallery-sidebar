@@ -1,7 +1,6 @@
 export type GalleryImage = {
   id: string;
   title: string;
-  category: string;
   url: string;
   description?: string;
   folder?: string;
