@@ -4,12 +4,15 @@ export const CHANNEL = "com.example.imagegallery.messages";
 export const VIEWER_POPOVER_ID = "com.example.imagegallery.viewer";
 
 export type GalleryMessage =
-  | { type: "SHOW"; image: GalleryImage }
-  | { type: "HIDE" };
+  | { type: "SHOW"; image: GalleryImage; recipients: string[] }
+  | { type: "HIDE"; recipients: string[] };
 
 export function isGalleryMessage(value: unknown): value is GalleryMessage {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
+  if (!Array.isArray(candidate.recipients) ||
+      !candidate.recipients.every((id) => typeof id === "string")) return false;
+
   if (candidate.type === "HIDE") return true;
   if (candidate.type !== "SHOW" || !candidate.image || typeof candidate.image !== "object") return false;
 
