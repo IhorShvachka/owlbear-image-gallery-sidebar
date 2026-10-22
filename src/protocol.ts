@@ -19,7 +19,6 @@ export function isGalleryMessage(value: unknown): value is GalleryMessage {
   const image = candidate.image as Record<string, unknown>;
   return typeof image.id === "string"
     && typeof image.title === "string"
-    && typeof image.category === "string"
     && typeof image.url === "string"
     && (image.description === undefined || typeof image.description === "string");
 }
