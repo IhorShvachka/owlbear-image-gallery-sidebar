@@ -11,6 +11,8 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 let catalog: GalleryImage[] = [...initialCatalog];
 let selectedId = catalog[0]?.id ?? "";
 let query = "";
+let selectedFolder = "Усі папки";
+let folders: string[] = [];
 let players: Recipient[] = [];
 let selectedRecipients = new Set<string>();
 let editingId: string | null = null;
@@ -31,6 +33,11 @@ app.innerHTML = `
     <input id="search" type="search" placeholder="Пошук назви, опису або категорії…" autocomplete="off" />
   </label>
 
+  <div class="folder-controls">
+    <select id="folder-filter" aria-label="Фільтр папок"><option>Усі папки</option></select>
+    <input id="new-folder" maxlength="60" placeholder="Назва нової папки">
+    <button id="create-folder" class="secondary">Створити</button>
+  </div>
   <div class="section-row"><span>КАТАЛОГ</span><span id="count" class="count"></span></div>
   <div id="gallery" class="gallery"></div>
   <section id="preview" class="preview"></section>
@@ -40,7 +47,8 @@ app.innerHTML = `
     <label class="field-label">Назва<input id="title-input" maxlength="100" placeholder="Наприклад, Таємничий храм"></label>
     <label class="field-label">Категорія<input id="category-input" maxlength="60" placeholder="Локації, NPC, Предмети…"></label>
     <label class="field-label">URL зображення<input id="url-input" type="url" placeholder="https://…"></label>
-    <label class="field-label">Опис<textarea id="description-input" rows="2" maxlength="500" placeholder="Короткий опис"></textarea></label>
+    <label class="field-label">Опис (необов’язково)<textarea id="description-input" rows="2" maxlength="500" placeholder="Короткий опис"></textarea></label>
+    <label class="field-label">Папка<select id="image-folder"><option value="">Без папки</option></select></label>
     <div class="actions">
       <button id="save-image" class="primary">Зберегти</button>
       <button id="cancel-edit" class="secondary" hidden>Скасувати</button>
@@ -79,6 +87,9 @@ const titleInput = $<HTMLInputElement>("#title-input");
 const categoryInput = $<HTMLInputElement>("#category-input");
 const urlInput = $<HTMLInputElement>("#url-input");
 const descriptionInput = $<HTMLTextAreaElement>("#description-input");
+const folderInput = $<HTMLSelectElement>("#image-folder");
+const folderFilter = $<HTMLSelectElement>("#folder-filter");
+const newFolderInput = $<HTMLInputElement>("#new-folder");
 const playerList = $("#player-list");
 const saveButton = $("#save-image");
 const cancelButton = $("#cancel-edit");
@@ -96,10 +107,11 @@ function getSelected(): GalleryImage | undefined {
 
 function filteredImages(): GalleryImage[] {
   const needle = query.trim().toLocaleLowerCase("uk");
-  return catalog.filter((image) =>
-    `${image.title} ${image.category} ${image.description ?? ""}`
-      .toLocaleLowerCase("uk").includes(needle)
-  );
+  return catalog.filter((image) => {
+    const matchesFolder = selectedFolder === "Усі папки" || (image.folder ?? "") === selectedFolder;
+    const matchesQuery = `${image.title} ${image.category} ${image.description ?? ""} ${image.folder ?? ""}`.toLocaleLowerCase("uk").includes(needle);
+    return matchesFolder && matchesQuery;
+  });
 }
 
 async function persistCatalog(): Promise<void> {
@@ -107,7 +119,19 @@ async function persistCatalog(): Promise<void> {
   await OBR.room.setMetadata({ [STORAGE_KEY]: catalog });
 }
 
+function renderFolders(): void {
+  folders = [...new Set([...folders, ...catalog.map((image) => image.folder).filter((folder): folder is string => !!folder)])].sort((a, b) => a.localeCompare(b, "uk"));
+  const currentFilter = selectedFolder;
+  folderFilter.innerHTML = ['<option value="Усі папки">Усі папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`)].join("");
+  folderFilter.value = folders.includes(currentFilter) || currentFilter === "Усі папки" ? currentFilter : "Усі папки";
+  if (folderFilter.value !== currentFilter) selectedFolder = folderFilter.value;
+  const currentFolder = folderInput.value;
+  folderInput.innerHTML = ['<option value="">Без папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`)].join("");
+  if (folders.includes(currentFolder)) folderInput.value = currentFolder;
+}
+
 function render(): void {
+  renderFolders();
   const images = filteredImages();
   count.textContent = `${images.length} / ${catalog.length}`;
 
@@ -120,7 +144,7 @@ function render(): void {
       <button class="tile ${image.id === selectedId ? "selected" : ""}" data-id="${escapeHtml(image.id)}" aria-pressed="${image.id === selectedId}">
         <img src="${escapeHtml(image.url)}" alt="" loading="lazy">
         <span class="tile-title">${escapeHtml(image.title)}</span>
-        <span class="tile-category">${escapeHtml(image.category)}</span>
+        <span class="tile-category">${escapeHtml(image.category || "Без категорії")}${image.folder ? " · 📁 " + escapeHtml(image.folder) : ""}</span>
       </button>
       <div class="tile-tools">
         <button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button>
@@ -156,6 +180,7 @@ function resetEditor(): void {
   categoryInput.value = "";
   urlInput.value = "";
   descriptionInput.value = "";
+  folderInput.value = "";
   $("#editor-heading").textContent = "ДОДАТИ ЗОБРАЖЕННЯ";
   saveButton.textContent = "Зберегти";
   cancelButton.hidden = true;
@@ -169,6 +194,7 @@ function editImage(id: string): void {
   categoryInput.value = image.category;
   urlInput.value = image.url;
   descriptionInput.value = image.description ?? "";
+  folderInput.value = image.folder ?? "";
   $("#editor-heading").textContent = "РЕДАГУВАТИ ЗОБРАЖЕННЯ";
   saveButton.textContent = "Зберегти зміни";
   cancelButton.hidden = false;
@@ -236,32 +262,53 @@ searchInput.addEventListener("input", () => {
   render();
 });
 
+folderFilter.addEventListener("change", () => {
+  selectedFolder = folderFilter.value;
+  render();
+});
+
+$("#create-folder").addEventListener("click", () => {
+  const name = newFolderInput.value.trim();
+  if (!name) { status.textContent = "Введи назву папки."; return; }
+  if (folders.some((folder) => folder.toLocaleLowerCase("uk") === name.toLocaleLowerCase("uk"))) {
+    status.textContent = "Папка з такою назвою вже існує."; return;
+  }
+  folders.push(name);
+  selectedFolder = name;
+  newFolderInput.value = "";
+  render();
+  folderInput.value = name;
+  status.textContent = "Папку створено. Обери її для нових зображень.";
+});
+
 saveButton.addEventListener("click", async () => {
-  const title = titleInput.value.trim();
-  const category = categoryInput.value.trim();
+  const title = titleInput.value.trim() || "Без назви";
+  const category = categoryInput.value.trim() || "Без категорії";
   const url = urlInput.value.trim();
   const description = descriptionInput.value.trim();
+  const folder = folderInput.value;
 
-  if (!title || !category || !url) {
-    status.textContent = "Заповни назву, категорію та URL зображення.";
+  if (!url) {
+    status.textContent = "Додай URL зображення або імпортуй його з Asset Manager.";
     return;
   }
   try {
-    new URL(url);
+    const parsed = new URL(url);
+    if (!["http:", "https:", "data:", "blob:"].includes(parsed.protocol)) throw new Error("Unsupported URL protocol");
   } catch {
-    status.textContent = "URL має бути коректним посиланням.";
+    status.textContent = "Вкажи коректне посилання на зображення.";
     return;
   }
 
   if (editingId) {
     catalog = catalog.map((image) => image.id === editingId
-      ? { ...image, title, category, url, description }
+      ? { ...image, title, category, url, description, folder: folder || undefined }
       : image);
     selectedId = editingId;
   } else {
     const image: GalleryImage = {
       id: crypto.randomUUID(),
-      title, category, url, description
+      title, category, url, description, folder: folder || undefined
     };
     catalog.unshift(image);
     selectedId = image.id;
@@ -302,20 +349,21 @@ $("#select-none").addEventListener("click", () => {
 $("#choose-asset").addEventListener("click", async () => {
   try {
     // SDK відкриває вибір активів; API не надає прямого списку всієї бібліотеки.
-    const assets = await OBR.assets.downloadImages(true, "", "PROP");
+    const assets = await OBR.assets.downloadImages(true, "");
     if (!assets.length) {
       status.textContent = "Зображення не вибрано.";
       return;
     }
     const existingUrls = new Set(catalog.map((image) => image.url));
     const imported: GalleryImage[] = assets
-      .filter((asset) => asset.image?.url && !existingUrls.has(asset.image.url))
+      .filter((asset) => typeof asset.image?.url === "string" && asset.image.url.length > 0 && !existingUrls.has(asset.image.url))
       .map((asset) => ({
         id: crypto.randomUUID(),
-        title: asset.name || "Зображення",
+        title: asset.name || "Без назви",
         category: asset.type || "Asset Manager",
         url: asset.image.url,
-        description: asset.description ?? ""
+        description: asset.description ?? "",
+        folder: folderInput.value || undefined
       }));
     if (!imported.length) {
       status.textContent = "Усі вибрані зображення вже є в каталозі.";
@@ -372,7 +420,7 @@ fileInput.addEventListener("change", async () => {
       description: ""
     })), "PROP");
 
-    status.textContent = `Імпортовано файлів: ${files.length}. Тепер натисни «Вибрати з Asset Manager», щоб додати потрібне зображення до каталогу.`;
+    status.textContent = `Файли завантажено в Asset Manager (${files.length}). Натисни «Імпортувати з Asset Manager» і вибери їх зі списку.`;
   } catch (error) {
     console.error(error);
     status.textContent = "Не вдалося імпортувати файли. Перевір формат і права доступу.";
@@ -424,6 +472,11 @@ render();
 
 OBR.onReady(async () => {
   try {
+    const role = await OBR.player.getRole();
+    if (role !== "GM") {
+      app.innerHTML = '<div class="access-denied"><strong>Галерея майстра</strong><p>Цей інструмент доступний лише майстру кімнати.</p></div>';
+      return;
+    }
     const metadata = await OBR.room.getMetadata();
     const saved = metadata[STORAGE_KEY];
     if (Array.isArray(saved)) {
@@ -441,6 +494,7 @@ OBR.onReady(async () => {
         typeof (item as GalleryImage).url === "string"
       );
       selectedId = catalog[0]?.id ?? "";
+      folders = [...new Set(catalog.map((image) => image.folder).filter((folder): folder is string => !!folder))];
     } else {
       await OBR.room.setMetadata({ [STORAGE_KEY]: catalog });
     }
