@@ -1,14 +1,19 @@
 import OBR from "@owlbear-rodeo/sdk";
 import { CHANNEL, isGalleryMessage, VIEWER_POPOVER_ID } from "./protocol";
 
-const BASE_URL = "/owlbear-image-gallery-sidebar/";
+const BASE_URL = "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/";
 
 OBR.onReady(() => {
   OBR.broadcast.onMessage(CHANNEL, async (event) => {
     if (!isGalleryMessage(event.data)) return;
-    const message = event.data;
 
     try {
+      const connectionId = await OBR.player.getConnectionId();
+      const message = event.data;
+
+      // Не відкривати вікно в майстра або в учасників, яких не обрали.
+      if (!message.recipients.includes(connectionId)) return;
+
       if (message.type === "HIDE") {
         await OBR.popover.close(VIEWER_POPOVER_ID);
         return;
