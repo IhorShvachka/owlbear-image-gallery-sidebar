@@ -4,6 +4,7 @@ import { CHANNEL } from "./protocol";
 import "./style.css";
 
 const STORAGE_KEY = "com.ihorshvachka.imagegallery.catalog.v1";
+const FOLDERS_KEY = "com.ihorshvachka.imagegallery.folders.v1";
 
 type Recipient = { id: string; name: string; role: string; connectionId: string };
 
@@ -116,7 +117,7 @@ function filteredImages(): GalleryImage[] {
 
 async function persistCatalog(): Promise<void> {
   if (!ready) return;
-  await OBR.room.setMetadata({ [STORAGE_KEY]: catalog });
+  await OBR.room.setMetadata({ [STORAGE_KEY]: catalog, [FOLDERS_KEY]: folders });
 }
 
 function renderFolders(): void {
@@ -278,7 +279,12 @@ $("#create-folder").addEventListener("click", () => {
   newFolderInput.value = "";
   render();
   folderInput.value = name;
-  status.textContent = "Папку створено. Обери її для нових зображень.";
+  void persistCatalog().then(() => {
+    status.textContent = "Папку створено й збережено. Обери її для нових зображень.";
+  }).catch((error) => {
+    console.error(error);
+    status.textContent = "Папку створено локально, але не вдалося зберегти її в кімнаті.";
+  });
 });
 
 saveButton.addEventListener("click", async () => {
@@ -478,6 +484,8 @@ OBR.onReady(async () => {
       return;
     }
     const metadata = await OBR.room.getMetadata();
+    const savedFolders = metadata[FOLDERS_KEY];
+    if (Array.isArray(savedFolders)) folders = savedFolders.filter((folder): folder is string => typeof folder === "string");
     const saved = metadata[STORAGE_KEY];
     if (Array.isArray(saved)) {
       const sampleIds = new Set([
