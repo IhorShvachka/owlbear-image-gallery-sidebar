@@ -1,6 +1,6 @@
 {
   "name": "Image Gallery",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "manifest_version": 1,
   "description": "Компактна галерея майстра для показу зображень учасникам кімнати.",
   "icon": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/icon.svg",
@@ -8,8 +8,8 @@
     "title": "Галерея зображень",
     "icon": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/icon.svg",
     "popover": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/",
-    "width": 380,
-    "height": 640
+    "width": 520,
+    "height": 760
   },
   "background_url": "https://ihorshvachka.github.io/owlbear-image-gallery-sidebar/background.html"
 }

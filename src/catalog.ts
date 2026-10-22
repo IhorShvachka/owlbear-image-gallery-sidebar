@@ -4,6 +4,7 @@ export type GalleryImage = {
   category: string;
   url: string;
   description?: string;
+  folder?: string;
 };
 
 // Галерея починається порожньою. Зображення додаються з Asset Manager або з файлів.
