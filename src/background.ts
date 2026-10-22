@@ -22,7 +22,7 @@ OBR.onReady(() => {
       const params = new URLSearchParams({
         url: message.image.url,
         title: message.image.title,
-        description: message.image.description ?? message.image.category
+        description: message.image.description ?? message.image.category ?? ""
       });
 
       await OBR.popover.close(VIEWER_POPOVER_ID).catch(() => undefined);
