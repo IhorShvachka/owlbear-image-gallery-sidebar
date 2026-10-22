@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <span class="header-icon" aria-hidden="true">▧</span>
+    <span class="header-version">v0.3.2</span><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
