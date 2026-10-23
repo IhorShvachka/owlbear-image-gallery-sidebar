@@ -1,6 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#292d3e"/>
-  <rect x="14" y="15" width="36" height="34" rx="4" fill="none" stroke="#e6e8f0" stroke-width="3"/>
-  <circle cx="25" cy="26" r="4" fill="#e6e8f0"/>
-  <path d="M17 44l10-10 7 7 5-5 8 8" fill="none" stroke="#9ca9ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#202a40"/><stop offset="1" stop-color="#0b1020"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffc34d"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+</defs>
+<rect width="256" height="256" rx="48" fill="url(#bg)"/>
+<circle cx="128" cy="105" r="78" fill="#fff" opacity=".06"/>
+<!-- rear fantasy image cards -->
+<g transform="rotate(-16 77 132)">
+ <rect x="26" y="76" width="100" height="116" rx="9" fill="#0b1020" stroke="#f8e8c8" stroke-width="5"/>
+ <rect x="33" y="83" width="86" height="102" rx="4" fill="#4c2b69"/>
+ <path d="M40 151 57 120 67 135 83 104 113 153 113 178 40 178Z" fill="#9a78d2"/>
+ <path d="M52 122 67 104 73 125 88 113 96 142 80 157 64 143Z" fill="#172033"/>
+</g>
+<g transform="rotate(15 179 132)">
+ <rect x="130" y="76" width="100" height="116" rx="9" fill="#0b1020" stroke="#f8e8c8" stroke-width="5"/>
+ <rect x="137" y="83" width="86" height="102" rx="4" fill="#285b5a"/>
+ <path d="M140 157 158 119 172 136 188 106 220 150 220 179 140 179Z" fill="#6f9c88"/>
+ <path d="M151 150 166 130 179 145 197 122 220 151 220 179 151 179Z" fill="#172033"/>
+</g>
+<!-- central image card -->
+<rect x="70" y="46" width="116" height="151" rx="11" fill="#0b1020" stroke="#f8e8c8" stroke-width="6"/>
+<rect x="79" y="55" width="98" height="133" rx="4" fill="#418ac0"/>
+<circle cx="143" cy="81" r="12" fill="#ffe8b8"/>
+<path d="M79 112 103 83 116 101 132 75 159 111 177 98 177 145 79 145Z" fill="#173454"/>
+<path d="M79 127 100 105 112 121 130 100 148 127 163 116 177 128 177 151 79 151Z" fill="#2f6597"/>
+<path d="M79 146 105 140 119 147 138 139 159 146 177 142 177 188 79 188Z" fill="#173454"/>
+<path d="M79 161 102 157 116 163 138 159 157 166 177 161 177 188 79 188Z" fill="#286ca2"/>
+<path d="M151 124 157 108 163 124Z M162 127 169 105 176 127Z" fill="#0b1020"/>
+<!-- gallery badge -->
+<circle cx="194" cy="184" r="39" fill="#0b1020"/>
+<circle cx="191" cy="181" r="33" fill="url(#gold)"/>
+<rect x="173" y="165" width="36" height="31" rx="4" fill="none" stroke="#172033" stroke-width="5"/>
+<circle cx="199" cy="173" r="4" fill="#172033"/>
+<path d="M177 191 186 180 193 187 198 182 205 191Z" fill="#172033"/>
+<!-- map base -->
+<path d="M28 202 56 192 86 201 115 194 145 203 172 195 225 207 207 221 170 227 135 220 99 230 61 220 33 214Z" fill="#e7bf87" opacity=".95"/>
 </svg>
