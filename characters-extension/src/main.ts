@@ -33,6 +33,7 @@ app.innerHTML = `
     <label>Власник персонажа<select id="owner-player"><option value="">Не призначено</option></select></label>
     <button id="assign">Зберегти шаблон і прив’язати токен</button>
     <button id="reload" class="secondary">Оновити список токенів</button>
+    <div class="notice">Важливо: вибір гравця тут зберігається в шаблоні, але не змінює нативного власника токена Owlbear і не обмежує права керування. Для цього окремо ввімкни <strong>Character → Owner Only</strong> та признач власника засобами Owlbear.</div>
     <div id="status" role="status" class="status">Підключення до Owlbear Rodeo…</div>
   </section>
   <section class="panel">
