@@ -354,6 +354,7 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
     await OBR.scene.items.updateItems([selected.id], (draft) => {
       for (const target of draft) {
         target.metadata = { ...target.metadata, [TOKEN_KEY]: recordId };
+        target.name = name;
         if (ownerId) target.createdUserId = ownerId;
       }
     });
