@@ -132,6 +132,40 @@ function renderCharacters(): void {
     `).join("");
 }
 
+async function reconcileActiveScene(): Promise<void> {
+  if (!ready || syncing) return;
+  syncing = true;
+  try {
+    const items = await OBR.scene.items.getItems();
+    const linked = items.filter((item: any) => item?.metadata?.[TOKEN_KEY]);
+    for (const item of linked as any[]) {
+      const characterId = String(item.metadata[TOKEN_KEY]);
+      const record = store.characters.find((entry) => entry.id === characterId);
+      if (!record) continue;
+      const current = syncableProperties(item);
+      const desired = record.properties;
+      if (fingerprint(current) === fingerprint(desired)) {
+        lastSnapshot.set(item.id, fingerprint(current));
+        continue;
+      }
+      await OBR.scene.items.updateItems([item.id], (draft) => {
+        for (const target of draft as any[]) {
+          // Keep each copy's map placement and its own extension metadata.
+          for (const [key, value] of Object.entries(desired)) {
+            (target as any)[key] = value;
+          }
+        }
+      });
+      lastSnapshot.set(item.id, fingerprint(desired));
+    }
+    await loadTokens();
+  } catch (error) {
+    console.error("Could not reconcile character templates on active scene", error);
+  } finally {
+    syncing = false;
+  }
+}
+
 async function handleSceneItems(items: any[]): Promise<void> {
   if (!ready || syncing) return;
   syncing = true;
@@ -268,7 +302,16 @@ OBR.onReady(async () => {
       void loadTokens();
       void handleSceneItems(items as any[]);
     });
-    OBR.room.onMetadataChange(() => void loadStore());
+    OBR.scene.onReadyChange((sceneReady) => {
+      if (!sceneReady) return;
+      void (async () => {
+        await loadStore();
+        await reconcileActiveScene();
+      })();
+    });
+    OBR.room.onMetadataChange(() => {
+      void loadStore().then(() => reconcileActiveScene());
+    });
   } catch (error) {
     console.error("Characters extension initialization failed", error);
     message("Не вдалося ініціалізувати розширення в цій кімнаті.");
