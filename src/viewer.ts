@@ -54,7 +54,13 @@ image.addEventListener("load", () => {
   const scale = Math.min(maxImageWidth / image.naturalWidth, maxImageHeight / image.naturalHeight, 1);
   const imageWidth = Math.max(180, Math.round(image.naturalWidth * scale));
   const imageHeight = Math.max(120, Math.round(image.naturalHeight * scale));
-  void sendViewerMessage({ type: "SIZE_VIEWER", width: imageWidth + 24, height: imageHeight + 118 });
+  const target = { width: imageWidth + 24, height: imageHeight + 118 };
+  try {
+    const saved = localStorage.getItem("image-gallery-viewer-size");
+    const current = saved ? JSON.parse(saved) : null;
+    if (current && Math.abs(current.width - target.width) < 8 && Math.abs(current.height - target.height) < 8) return;
+  } catch { /* Send the size if no valid saved size exists. */ }
+  void sendViewerMessage({ type: "SIZE_VIEWER", ...target });
 });
 
 image.addEventListener("error", () => {
