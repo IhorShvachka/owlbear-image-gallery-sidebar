@@ -358,13 +358,15 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
 
     const refreshed = (await OBR.scene.items.getItems([selected.id]))[0] as any;
     if (!refreshed) throw new Error("Token disappeared after tagging");
+    const properties = syncableProperties(refreshed);
+    properties.name = name;
     const record: CharacterRecord = {
       id: recordId,
       name,
       ownerName,
       ownerId,
       tokenName: token.name,
-      properties: syncableProperties(refreshed),
+      properties,
       updatedAt: Date.now()
     };
     store.characters = [...store.characters.filter((character) => character.id !== record.id), record];
