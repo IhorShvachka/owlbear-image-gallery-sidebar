@@ -261,7 +261,7 @@ gallery.addEventListener("click", async (event) => {
 // Закриваємо віконце опису при будь-якому натисканні поза кнопкою «i».
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
-  if (target.closest("[data-info]") || target.closest(".info-popover")) return;
+  if (target.closest("[data-info]")) return;
   gallery.querySelectorAll(".info-popover").forEach((el) => el.remove());
 });
 searchInput.addEventListener("input", () => {
