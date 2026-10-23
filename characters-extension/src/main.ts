@@ -14,7 +14,6 @@ type CharacterRecord = {
   properties: Record<string, unknown>;
   updatedAt: number;
 };
-
 type CharacterStore = { characters: CharacterRecord[] };
 type TokenSummary = { id: string; name: string; type: string };
 
@@ -27,12 +26,12 @@ app.innerHTML = `
   </header>
   <section class="panel">
     <div class="section-title">ПРИЗНАЧИТИ ПЕРСОНАЖА</div>
-    <p class="hint">Вибери токен на поточній карті та признач власника. Збережені токени з одним шаблоном синхронізуються в межах активної карти; координати, поворот і масштаб не копіюються.</p>
+    <p class="hint">Вибери токен на поточній карті та признач власника. Позначені копії одного персонажа на активній карті синхронізуються без перенесення позиції, повороту й масштабу.</p>
     <label>Токен на поточній карті<select id="token"><option value="">Завантаження токенів…</option></select></label>
     <label>Ім’я персонажа<input id="character-name" maxlength="100" placeholder="Наприклад, Елара"></label>
     <label>Ім’я гравця<input id="owner-name" maxlength="100" placeholder="Ім’я гравця в кімнаті"></label>
     <label>ID гравця (необов’язково)<input id="owner-id" maxlength="160" placeholder="Для точного зіставлення користувача"></label>
-    <button id="assign">Зберегти шаблон</button>
+    <button id="assign">Зберегти шаблон і прив’язати токен</button>
     <button id="reload" class="secondary">Оновити список токенів</button>
     <div id="status" role="status" class="status">Підключення до Owlbear Rodeo…</div>
   </section>
@@ -40,7 +39,7 @@ app.innerHTML = `
     <div class="section-title">ЗБЕРЕЖЕНІ ШАБЛОНИ</div>
     <div id="characters" class="characters"><p class="muted">Завантаження…</p></div>
   </section>
-  <footer>Розташування токенів не є частиною шаблону. Синхронізація між різними сценами та надійне обмеження прав потребують окремої реалізації й перевірки.</footer>
+  <footer>Шаблони зберігаються в метаданих кімнати. Синхронізація між різними сценами та справжнє обмеження прав гравців ще не реалізовані.</footer>
 `;
 
 const tokenSelect = app.querySelector<HTMLSelectElement>("#token")!;
@@ -52,7 +51,26 @@ const charactersEl = app.querySelector<HTMLDivElement>("#characters")!;
 
 let tokens: TokenSummary[] = [];
 let store: CharacterStore = { characters: [] };
-let ready = false;\nlet syncing = false;\nlet lastSnapshot = new Map<string, string>();\nconst TRANSFORM_FIELDS = new Set(["id", "position", "rotation", "scale", "lastModified", "lastModifiedUserId", "createdUserId", "metadata"]);\n\nfunction syncableProperties(item: Record<string, any>): Record<string, unknown> {\n  const result: Record<string, unknown> = {};\n  for (const [key, value] of Object.entries(item)) {\n    if (TRANSFORM_FIELDS.has(key)) continue;\n    result[key] = value;\n  }\n  return result;\n}\n\nfunction stable(value: unknown): string {\n  try { return JSON.stringify(value, Object.keys((value && typeof value === "object") ? value as object : {}).sort()); } catch { return String(value); }\n}\n\nasync function handleSceneItems(items: any[]): Promise<void> {\n  if (!ready || syncing) return;\n  const linked = items.filter((item) => item?.metadata?.[TOKEN_KEY]);\n  if (!linked.length) return;\n  syncing = true;\n  try {\n    let changed = false;\n    for (const item of linked) {\n      const characterId = String(item.metadata[TOKEN_KEY]);\n      const record = store.characters.find((entry) => entry.id === characterId);\n      if (!record) continue;\n      const props = syncableProperties(item);\n      const fingerprint = JSON.stringify(props);\n      const previous = lastSnapshot.get(item.id);\n      lastSnapshot.set(item.id, fingerprint);\n      if (previous === undefined || previous === fingerprint) continue;\n      record.properties = props;\n      record.tokenName = item.name || record.tokenName;\n      record.updatedAt = Date.now();\n      changed = true;\n      const peers = linked.filter((other) => other.id !== item.id && String(other.metadata[TOKEN_KEY]) === characterId);\n      for (const peer of peers) {\n        await OBR.scene.items.updateItems([peer.id], (draft) => {\n          for (const target of draft) {\n            for (const [key, value] of Object.entries(props)) {\n              (target as any)[key] = value;\n            }\n          }\n        });\n      }\n    }\n    if (changed) await saveStore();\n  } catch (error) {\n    console.error("Character sync failed", error);\n  } finally {\n    syncing = false;\n  }\n}
+let ready = false;
+let syncing = false;
+const lastSnapshot = new Map<string, string>();
+
+const EXCLUDED_FIELDS = new Set([
+  "id", "position", "rotation", "scale", "lastModified",
+  "lastModifiedUserId", "createdUserId", "metadata"
+]);
+
+function syncableProperties(item: Record<string, any>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(item)) {
+    if (!EXCLUDED_FIELDS.has(key)) result[key] = value;
+  }
+  return result;
+}
+
+function fingerprint(value: unknown): string {
+  return JSON.stringify(value);
+}
 
 function message(text: string): void {
   status.textContent = text;
@@ -94,7 +112,7 @@ async function loadTokens(): Promise<void> {
     if (!tokens.length) message("На поточній карті не знайдено відповідних токенів.");
   } catch (error) {
     console.error("Could not load scene items", error);
-    message("Не вдалося прочитати токени поточної карти. Перевір доступ розширення.");
+    message("Не вдалося прочитати токени поточної карти.");
   }
 }
 
@@ -114,6 +132,64 @@ function renderCharacters(): void {
     `).join("");
 }
 
+async function handleSceneItems(items: any[]): Promise<void> {
+  if (!ready || syncing) return;
+  syncing = true;
+  try {
+    const linked = items.filter((item) => item?.metadata?.[TOKEN_KEY]);
+    const updatesByCharacter = new Map<string, Record<string, unknown>>();
+    let changedStore = false;
+
+    for (const item of linked) {
+      const characterId = String(item.metadata[TOKEN_KEY]);
+      const record = store.characters.find((entry) => entry.id === characterId);
+      if (!record) continue;
+
+      const props = syncableProperties(item);
+      const currentFingerprint = fingerprint(props);
+      const previousFingerprint = lastSnapshot.get(item.id);
+
+      // First observation initializes the baseline instead of treating it as a user edit.
+      if (previousFingerprint === undefined) {
+        lastSnapshot.set(item.id, currentFingerprint);
+        continue;
+      }
+      if (previousFingerprint === currentFingerprint) continue;
+
+      lastSnapshot.set(item.id, currentFingerprint);
+      record.properties = props;
+      record.tokenName = item.name || record.tokenName;
+      record.updatedAt = Date.now();
+      updatesByCharacter.set(characterId, props);
+      changedStore = true;
+    }
+
+    // Apply changed canonical properties to other copies on the currently active scene.
+    for (const [characterId, props] of updatesByCharacter) {
+      for (const peer of linked) {
+        if (String(peer.metadata[TOKEN_KEY]) !== characterId) continue;
+        const peerProps = syncableProperties(peer);
+        if (fingerprint(peerProps) === fingerprint(props)) continue;
+        await OBR.scene.items.updateItems([peer.id], (draft) => {
+          for (const target of draft) {
+            for (const [key, value] of Object.entries(props)) (target as any)[key] = value;
+          }
+        });
+        lastSnapshot.set(peer.id, fingerprint(props));
+      }
+    }
+
+    if (changedStore) {
+      await saveStore();
+      renderCharacters();
+    }
+  } catch (error) {
+    console.error("Character sync failed", error);
+  } finally {
+    syncing = false;
+  }
+}
+
 app.querySelector<HTMLButtonElement>("#reload")!.addEventListener("click", () => void loadTokens());
 
 app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async () => {
@@ -126,6 +202,7 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
   const name = nameInput.value.trim() || token.name;
   const ownerName = ownerInput.value.trim();
   const ownerId = ownerIdInput.value.trim();
+
   try {
     const items = await OBR.scene.items.getItems([token.id]);
     const selected = items[0] as any;
@@ -133,25 +210,31 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
       message("Токен більше не знайдено на цій карті. Онови список.");
       return;
     }
-    const properties = { ...selected } as Record<string, unknown>;
-    delete properties.position;
-    delete properties.rotation;
-    delete properties.scale;
-    delete properties.id;
-    const existing = store.characters.find((character) => character.id === token.id);
+
+    const existing = store.characters.find((character) => character.id === selected.metadata?.[TOKEN_KEY]);
+    const recordId = existing?.id ?? crypto.randomUUID();
+    await OBR.scene.items.updateItems([selected.id], (draft) => {
+      for (const target of draft) {
+        target.metadata = { ...target.metadata, [TOKEN_KEY]: recordId };
+      }
+    });
+
+    const refreshed = (await OBR.scene.items.getItems([selected.id]))[0] as any;
+    if (!refreshed) throw new Error("Token disappeared after tagging");
     const record: CharacterRecord = {
-      id: existing?.id ?? token.id,
+      id: recordId,
       name,
       ownerName,
       ownerId,
       tokenName: token.name,
-      properties,
+      properties: syncableProperties(refreshed),
       updatedAt: Date.now()
     };
     store.characters = [...store.characters.filter((character) => character.id !== record.id), record];
+    lastSnapshot.set(refreshed.id, fingerprint(record.properties));
     await saveStore();
     renderCharacters();
-    message(`Шаблон «${name}» збережено в метаданих кімнати. Зміни шаблону відстежуються для позначених копій на активній карті. Для синхронізації між різними картами потрібен окремий етап.`);
+    message(`Шаблон «${name}» збережено, а токен прив’язано до нього. Синхронізація працює лише для позначених копій на активній карті.`);
   } catch (error) {
     console.error("Could not save character template", error);
     message("Не вдалося зберегти шаблон. Перевір консоль Owlbear для деталей.");
@@ -166,7 +249,7 @@ charactersEl.addEventListener("click", async (event) => {
   try {
     await saveStore();
     renderCharacters();
-    message("Шаблон видалено. Токен на карті не видалявся.");
+    message("Шаблон видалено. Токени на карті не видалялися й не розв’язувалися автоматично.");
   } catch (error) {
     console.error(error);
     message("Не вдалося видалити шаблон.");
@@ -178,8 +261,13 @@ OBR.onReady(async () => {
     await loadStore();
     await loadTokens();
     ready = true;
-    message("Підключено. Це початковий модуль шаблонів.");
-    OBR.scene.items.onChange((items) => { void loadTokens(); void handleSceneItems(items as any[]); });
+    message("Підключено. Початковий модуль шаблонів активний.");
+    const initialItems = await OBR.scene.items.getItems();
+    await handleSceneItems(initialItems as any[]);
+    OBR.scene.items.onChange((items) => {
+      void loadTokens();
+      void handleSceneItems(items as any[]);
+    });
     OBR.room.onMetadataChange(() => void loadStore());
   } catch (error) {
     console.error("Characters extension initialization failed", error);
