@@ -62,7 +62,7 @@ const EXCLUDED_FIELDS = new Set([
 
 // Track writes performed by the extension so their onChange events do not become
 // mistaken for player edits and overwrite the canonical template.
-const pendingSyncWrites = new Set<string>();
+const pendingSyncWrites = new Map<string, string>();
 
 function syncableProperties(item: Record<string, any>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -152,7 +152,8 @@ async function reconcileActiveScene(): Promise<void> {
         lastSnapshot.set(item.id, fingerprint(current));
         continue;
       }
-      pendingSyncWrites.add(item.id);
+      const expectedFingerprint = fingerprint(desired);
+      pendingSyncWrites.set(item.id, expectedFingerprint);
       await OBR.scene.items.updateItems([item.id], (draft) => {
         for (const target of draft as any[]) {
           // Keep each copy's map placement and its own extension metadata.
@@ -161,7 +162,7 @@ async function reconcileActiveScene(): Promise<void> {
           }
         }
       });
-      lastSnapshot.set(item.id, fingerprint(desired));
+      lastSnapshot.set(item.id, expectedFingerprint);
     }
     await loadTokens();
   } catch (error) {
@@ -188,11 +189,14 @@ async function handleSceneItems(items: any[]): Promise<void> {
       const currentFingerprint = fingerprint(props);
       const previousFingerprint = lastSnapshot.get(item.id);
 
-      if (pendingSyncWrites.has(item.id)) {
+      const pendingFingerprint = pendingSyncWrites.get(item.id);
+      if (pendingFingerprint !== undefined && pendingFingerprint === currentFingerprint) {
         pendingSyncWrites.delete(item.id);
         lastSnapshot.set(item.id, currentFingerprint);
         continue;
       }
+      // If a newer manual edit happened after our write, do not suppress it.
+      if (pendingFingerprint !== undefined) pendingSyncWrites.delete(item.id);
 
       // First observation initializes the baseline instead of treating it as a user edit.
       if (previousFingerprint === undefined) {
@@ -215,13 +219,14 @@ async function handleSceneItems(items: any[]): Promise<void> {
         if (String(peer.metadata[TOKEN_KEY]) !== characterId) continue;
         const peerProps = syncableProperties(peer);
         if (fingerprint(peerProps) === fingerprint(props)) continue;
-        pendingSyncWrites.add(peer.id);
+        const expectedFingerprint = fingerprint(props);
+        pendingSyncWrites.set(peer.id, expectedFingerprint);
         await OBR.scene.items.updateItems([peer.id], (draft) => {
           for (const target of draft) {
             for (const [key, value] of Object.entries(props)) (target as any)[key] = value;
           }
         });
-        lastSnapshot.set(peer.id, fingerprint(props));
+        lastSnapshot.set(peer.id, expectedFingerprint);
       }
     }
 
