@@ -412,38 +412,42 @@ $("#select-none").addEventListener("click", () => {
 
 $("#choose-asset").addEventListener("click", async () => {
   try {
-    // SDK відкриває вибір активів; API не надає прямого списку всієї бібліотеки.
+    status.textContent = "Відкриваю вікно вибору зображень Owlbear Rodeo…";
     const assets = await OBR.assets.downloadImages(true, "", "PROP");
-    if (!assets.length) {
-      status.textContent = "Зображення не вибрано.";
+    if (!assets || assets.length === 0) {
+      status.textContent = "Імпорт скасовано або зображення не вибрано.";
       return;
     }
     const existingUrls = new Set(catalog.map((image) => image.url));
-    const imported: GalleryImage[] = assets
-      .filter((asset) => typeof asset.image?.url === "string" && asset.image.url.length > 0 && !existingUrls.has(asset.image.url))
-      .map((asset) => ({
+    const imported: GalleryImage[] = [];
+    for (const asset of assets) {
+      const url = asset.image?.url;
+      if (typeof url !== "string" || !url.trim() || existingUrls.has(url)) continue;
+      existingUrls.add(url);
+      imported.push({
         id: crypto.randomUUID(),
-        title: asset.name || "Без назви",
+        title: asset.name?.trim() || "Без назви",
         category: asset.type || "Asset Manager",
-        url: asset.image.url,
+        url,
         description: asset.description ?? "",
-        folder: folderInput.value || undefined
-      }));
+        folder: selectedFolder || folderInput.value || undefined
+      });
+    }
     if (!imported.length) {
-      status.textContent = "Усі вибрані зображення вже є в каталозі.";
+      status.textContent = "Не знайдено нових зображень серед вибраних елементів. Спробуй вибрати зображення типу Props у вікні Owlbear.";
       return;
     }
     catalog = [...imported, ...catalog];
     selectedId = imported[0].id;
     await persistCatalog();
     render();
-    status.textContent = "Додано з Asset Manager: " + imported.length + " зображень.";
+    $("#share-controls").hidden = false;
+    status.textContent = `Імпортовано ${imported.length} зображень з Asset Manager.`;
   } catch (error) {
-    console.error(error);
-    status.textContent = "Не вдалося імпортувати зображення з Asset Manager.";
+    console.error("Asset Manager import failed:", error);
+    status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : String(error)}`;
   }
 });
-
 $("#upload-local").addEventListener("click", () => fileInput.click());
 
 fileInput.addEventListener("change", async () => {
