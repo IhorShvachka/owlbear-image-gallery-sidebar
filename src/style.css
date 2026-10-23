@@ -87,3 +87,6 @@ footer { color: #777e93; font-size: 10px; border-top: 1px solid #303447; padding
 .folder-create input{min-width:0;width:100%;padding:8px;border:1px solid #373b4d;border-radius:8px;background:#222533;color:#f1f2f7;font:inherit;font-size:11px}
 .folder-create button{padding:8px;font-size:10px}
 @media(max-width:380px){.folder-create{grid-template-columns:1fr 1fr}.folder-create input{grid-column:1/-1}}
+
+/* Image details and contextual sharing controls */
+.gallery-item{position:relative}.info-button{position:absolute;top:7px;right:7px;width:22px;height:22px;border:1px solid #b9c1ff;border-radius:50%;background:#171923e8;color:#d0d5ff;font-weight:800;font-size:12px;cursor:pointer;display:grid;place-items:center;padding:0}.info-button:hover{background:#41465b}.share-controls[hidden],.preview[hidden]{display:none!important}.share-controls{margin-top:12px}.preview{margin-top:10px}
