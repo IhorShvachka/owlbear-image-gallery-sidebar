@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <span class="header-version">v0.3.2</span><span class="header-icon" aria-hidden="true">▧</span>
+    <span class="header-version">v0.3.4</span><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
@@ -42,7 +42,7 @@ app.innerHTML = `
   </section>
   <div class="section-row"><span>КАТАЛОГ</span><span id="count" class="count"></span></div>
   <div id="gallery" class="gallery"></div>
-  <section id="preview" class="preview"></section>
+  <section id="preview" class="preview" hidden></section>
 
   <section class="editor">
     <div class="section-row"><span id="editor-heading">ДОДАТИ ЗОБРАЖЕННЯ</span></div>
@@ -61,19 +61,15 @@ app.innerHTML = `
     </div>
   </section>
 
-  <section class="recipients">
-    <div class="section-row"><span>ПОКАЗАТИ КОМУ</span><button id="refresh-players" class="text-button">Оновити</button></div>
-    <div id="player-list" class="player-list">Завантаження учасників…</div>
-    <div class="actions">
-      <button id="select-all" class="secondary">Обрати всіх</button>
-      <button id="select-none" class="secondary">Зняти вибір</button>
-    </div>
+  <section id="share-controls" class="share-controls" hidden>
+    <div class="section-row"><span>ПОКАЗАТИ ГРАВЦЯМ</span><button id="refresh-players" class="text-button">Оновити список</button></div>
+    <section class="recipients">
+      <div id="player-list" class="player-list">Завантаження учасників…</div>
+      <div class="actions"><button id="select-all" class="secondary">Обрати всіх</button><button id="select-none" class="secondary">Зняти вибір</button></div>
+    </section>
+    <div class="actions"><button id="show" class="primary">↗ Показати обраним</button><button id="hide" class="secondary">Приховати</button></div>
   </section>
 
-  <div class="actions">
-    <button id="show" class="primary">↗ Показати обраним</button>
-    <button id="hide" class="secondary">Приховати</button>
-  </div>
   <div id="status" class="status" role="status">Очікування підключення до Owlbear Rodeo…</div>
   <footer>Зображення відкриваються у вікні учасника й не додаються на ігрову карту.</footer>
 `;
@@ -110,7 +106,7 @@ function getSelected(): GalleryImage | undefined {
 function filteredImages(): GalleryImage[] {
   const needle = query.trim().toLocaleLowerCase("uk");
   return catalog.filter((image) => {
-    const matchesFolder = selectedFolder ? ((image.folder ?? "") === selectedFolder || (image.folder ?? "").startsWith(selectedFolder + "/")) : !(image.folder ?? "").includes("/");
+    const matchesFolder = (image.folder ?? "") === selectedFolder;
     const matchesQuery = `${image.title} ${image.description ?? ""}`.toLocaleLowerCase("uk").includes(needle);
     return matchesFolder && matchesQuery;
   });
@@ -161,6 +157,7 @@ function render(): void {
         <span class="tile-title">${escapeHtml(image.title)}</span>
         <span class="tile-category">${image.folder ? "📁 " + escapeHtml(image.folder.split("/").slice(-1)[0]) : "Без папки"}</span>
       </button>
+      <button class="info-button" data-info="${escapeHtml(image.id)}" aria-label="Показати опис" title="Показати опис">i</button>
       <div class="tile-tools">
         <button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button>
         <button data-delete="${escapeHtml(image.id)}" class="text-button danger">Видалити</button>
@@ -169,12 +166,13 @@ function render(): void {
   `).join("") : `<div class="empty">Нічого не знайдено.</div>`;
 
   const image = getSelected();
-  preview.innerHTML = image
-    ? `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}">
-       <div class="preview-copy"><span class="preview-label">ВИБРАНО</span><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description ?? "")}</span></div>`
-    : `<div class="empty">Додай зображення або обери його в каталозі.</div>`;
-
-  $("#show").toggleAttribute("disabled", !image || selectedRecipients.size === 0);
+  const selectedIsVisible = !!image && images.some((item) => item.id === image.id);
+  preview.hidden = true;
+  preview.innerHTML = image && selectedIsVisible
+    ? `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}"><div class="preview-copy"><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description || "Опис відсутній.")}</span></div>`
+    : "";
+  $("#share-controls").hidden = !selectedIsVisible;
+  $("#show").toggleAttribute("disabled", !selectedIsVisible || selectedRecipients.size === 0);
 }
 
 function renderPlayers(): void {
@@ -241,6 +239,19 @@ gallery.addEventListener("click", async (event) => {
   const edit = target.closest<HTMLButtonElement>("[data-edit]");
   const del = target.closest<HTMLButtonElement>("[data-delete]");
   const tile = target.closest<HTMLButtonElement>("[data-id]");
+  const info = target.closest<HTMLButtonElement>("[data-info]");
+
+  if (info?.dataset.info) {
+    const image = catalog.find((item) => item.id === info.dataset.info);
+    if (image) {
+      selectedId = image.id;
+      preview.hidden = false;
+      preview.innerHTML = `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}"><div class="preview-copy"><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description || "Опис відсутній.")}</span></div>`;
+      $("#share-controls").hidden = false;
+      $("#show").toggleAttribute("disabled", selectedRecipients.size === 0);
+    }
+    return;
+  }
 
   if (edit?.dataset.edit) {
     editImage(edit.dataset.edit);
@@ -267,6 +278,7 @@ gallery.addEventListener("click", async (event) => {
   if (tile?.dataset.id) {
     selectedId = tile.dataset.id;
     render();
+    $("#share-controls").hidden = false;
   }
 });
 
@@ -401,7 +413,7 @@ $("#select-none").addEventListener("click", () => {
 $("#choose-asset").addEventListener("click", async () => {
   try {
     // SDK відкриває вибір активів; API не надає прямого списку всієї бібліотеки.
-    const assets = await OBR.assets.downloadImages(true, "");
+    const assets = await OBR.assets.downloadImages(true, "", "PROP");
     if (!assets.length) {
       status.textContent = "Зображення не вибрано.";
       return;
@@ -556,7 +568,7 @@ OBR.onReady(async () => {
         typeof (item as GalleryImage).url === "string"
       );
       selectedId = catalog[0]?.id ?? "";
-      folders = [...new Set(catalog.map((image) => image.folder).filter((folder): folder is string => !!folder))];
+      folders = [...new Set([...folders, ...catalog.map((image) => image.folder).filter((folder): folder is string => !!folder)])];
     } else {
       await OBR.room.setMetadata({ [STORAGE_KEY]: catalog });
     }
