@@ -59,9 +59,9 @@ OBR.onReady(() => {
           width: Math.max(220, Math.min(900, Math.round(message.width))),
           height: Math.max(160, Math.min(900, Math.round(message.height)))
         };
+        // Store the image's preferred size for the next opening. Do not close/reopen
+        // the active popover here: doing so can leave Owlbear's viewer blank.
         localStorage.setItem(SIZE_KEY, JSON.stringify(size));
-        const currentUrl = localStorage.getItem(URL_KEY);
-        if (currentUrl) await openViewer(currentUrl, undefined, size);
         return;
       }
 
