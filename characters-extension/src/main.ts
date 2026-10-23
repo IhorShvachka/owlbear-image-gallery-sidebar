@@ -1,4 +1,4 @@
-import OBR from "@owlbear-rodeo/sdk";
+import OBR, { buildImage } from "@owlbear-rodeo/sdk";
 import "./style.css";
 
 const EXTENSION_ID = "com.ihorshvachka.characters";
@@ -169,7 +169,7 @@ function renderCharacters(): void {
     .map((character) => `
       <article class="character">
         <div><strong>${safe(character.name)}</strong><div class="muted">Токен: ${safe(character.tokenName)}</div><div class="muted">Гравець: ${safe(character.ownerName || "Не призначений")}</div></div>
-        <button class="secondary remove" data-remove="${safe(character.id)}">Видалити</button>
+        <div class="character-actions"><button class="secondary" data-create="${safe(character.id)}">Створити копію</button><button class="secondary remove" data-remove="${safe(character.id)}">Видалити</button></div>
       </article>
     `).join("");
 }
@@ -279,6 +279,53 @@ async function handleSceneItems(items: any[]): Promise<void> {
   }
 }
 
+async function createCharacterCopy(characterId: string): Promise<void> {
+  const record = store.characters.find((entry) => entry.id === characterId);
+  if (!record) return;
+  if (await OBR.player.getRole() !== "GM") {
+    message("Створювати копії персонажів може лише ведучий.");
+    return;
+  }
+
+  const props = record.properties as Record<string, any>;
+  if (!props.image || !props.grid) {
+    message("У цього шаблону немає даних зображення, необхідних для створення копії.");
+    return;
+  }
+
+  try {
+    const center = await OBR.viewport.getPosition();
+    const builder = buildImage(props.image, props.grid)
+      .name(record.name)
+      .position({ x: center.x, y: center.y })
+      .rotation(0)
+      .scale({ x: 1, y: 1 })
+      .layer("CHARACTER")
+      .metadata({ [TOKEN_KEY]: record.id });
+
+    if (typeof props.visible === "boolean") builder.visible(props.visible);
+    if (typeof props.locked === "boolean") builder.locked(props.locked);
+    if (typeof props.description === "string") builder.description(props.description);
+    if (typeof props.zIndex === "number") builder.zIndex(props.zIndex);
+    if (props.text) builder.text(props.text);
+    if (props.textItemType === "LABEL" || props.textItemType === "TEXT") {
+      builder.textItemType(props.textItemType);
+    }
+    if (typeof props.disableHit === "boolean") builder.disableHit(props.disableHit);
+    if (typeof props.disableAutoZIndex === "boolean") builder.disableAutoZIndex(props.disableAutoZIndex);
+    if (Array.isArray(props.disableAttachmentBehavior)) {
+      builder.disableAttachmentBehavior(props.disableAttachmentBehavior);
+    }
+
+    await OBR.scene.items.addItems([builder.build()]);
+    await loadTokens();
+    message(`Копію «${record.name}» додано в центр поточного перегляду. Її позицію можна змінювати незалежно від інших копій.`);
+  } catch (error) {
+    console.error("Could not create character copy", error);
+    message("Не вдалося створити копію персонажа. Перевір консоль Owlbear для деталей.");
+  }
+}
+
 app.querySelector<HTMLButtonElement>("#reload")!.addEventListener("click", () => void loadTokens());
 
 app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async () => {
@@ -332,7 +379,13 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
 });
 
 charactersEl.addEventListener("click", async (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-remove]");
+  const target = event.target as HTMLElement;
+  const createButton = target.closest<HTMLButtonElement>("[data-create]");
+  if (createButton?.dataset.create && ready) {
+    await createCharacterCopy(createButton.dataset.create);
+    return;
+  }
+  const button = target.closest<HTMLButtonElement>("[data-remove]");
   const id = button?.dataset.remove;
   if (!id || !ready) return;
   store.characters = store.characters.filter((character) => character.id !== id);
