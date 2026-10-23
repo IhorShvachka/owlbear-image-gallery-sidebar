@@ -79,7 +79,7 @@ async function loadTokens(): Promise<void> {
   try {
     const items = await OBR.scene.items.getItems();
     tokens = items
-      .filter((item) => item.type === "IMAGE" || item.type === "CHARACTER" || item.type === "ATTACHMENT")
+      .filter((item) => item.type === "IMAGE" || item.type === "ATTACHMENT")
       .map((item) => ({
         id: item.id,
         name: item.name?.trim() || `Без назви · ${item.id.slice(0, 8)}`,
