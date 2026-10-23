@@ -55,9 +55,21 @@ let ready = false;
 let syncing = false;
 const lastSnapshot = new Map<string, string>();
 
-const EXCLUDED_FIELDS = new Set([
-  "id", "position", "rotation", "scale", "lastModified",
-  "lastModifiedUserId", "createdUserId", "metadata"
+// Only copy properties documented as item/image content or presentation.
+// Identity, ownership, layer, metadata and map transforms are deliberately local.
+const SYNCABLE_FIELDS = new Set([
+  "name",
+  "visible",
+  "locked",
+  "zIndex",
+  "disableHit",
+  "disableAutoZIndex",
+  "disableAttachmentBehavior",
+  "description",
+  "image",
+  "grid",
+  "text",
+  "textItemType"
 ]);
 
 // Track writes performed by the extension so their onChange events do not become
@@ -66,8 +78,10 @@ const pendingSyncWrites = new Map<string, string>();
 
 function syncableProperties(item: Record<string, any>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(item)) {
-    if (!EXCLUDED_FIELDS.has(key)) result[key] = value;
+  for (const key of SYNCABLE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(item, key)) {
+      result[key] = item[key];
+    }
   }
   return result;
 }
