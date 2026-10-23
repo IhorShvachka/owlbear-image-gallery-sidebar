@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <div class="header-actions"><button id="choose-asset" class="import-quick" title="Імпортувати з Asset Manager">↧ Імпорт</button><button id="open-editor" class="import-quick" title="Додати зображення за посиланням">＋ URL</button><span class="header-version">v0.3.7</span></div><span class="header-icon" aria-hidden="true">▧</span>
+    <div class="header-actions"><button id="choose-asset" class="import-quick" title="Імпортувати з Asset Manager">↧ Імпорт</button><button id="open-editor" class="import-quick" title="Додати зображення за посиланням">＋ URL</button><span class="header-version">v0.4.1</span></div><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
