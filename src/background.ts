@@ -32,9 +32,9 @@ OBR.onReady(() => {
         width: 360,
         height: 520,
         anchorReference: "POSITION",
-        anchorPosition: { left: 1180, top: 420 },
-        anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
-        transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
+        anchorPosition: { left: 1180, top: 760 },
+        anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
+        transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
         disableClickAway: true
       });
     } catch (error) {
