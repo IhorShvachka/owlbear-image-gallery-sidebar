@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <span class="header-version">v0.3.7</span><span class="header-icon" aria-hidden="true">▧</span>
+    <div class="header-actions"><button id="choose-asset" class="import-quick" title="Імпортувати з Asset Manager">↧ Імпорт</button><button id="open-editor" class="import-quick" title="Додати зображення за посиланням">＋ URL</button><span class="header-version">v0.3.7</span></div><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
@@ -436,7 +436,7 @@ $("#choose-asset").addEventListener("click", async () => {
     status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : (() => { try { return JSON.stringify(error); } catch { return String(error); } })()}`;
   }
 });
-/* Local file upload removed; import through Owlbear Asset Manager. */
+
 /*
 fileInput.addEventListener("change", async () => {
   const files = Array.from(fileInput.files ?? []);
