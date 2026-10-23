@@ -77,7 +77,6 @@ const folderInput = $<HTMLSelectElement>("#image-folder");
 const folderLocation = $("#folder-location");
 const folderBreadcrumbs = $("#folder-breadcrumbs");
 const newFolderInput = $<HTMLInputElement>("#new-folder");
-const playerList = $("#player-list");
 const saveButton = $("#save-image");
 const cancelButton = $("#cancel-edit");
 const fileInput = $<HTMLInputElement>("#file-input");
@@ -159,15 +158,16 @@ function render(): void {
 }
 
 function renderPlayers(): void {
+  render();
+  const playerList = app.querySelector<HTMLElement>("#player-list");
+  if (!playerList) return;
   playerList.innerHTML = players.length ? players.map((player) => `
     <label class="player-option">
-      <input type="checkbox" data-player="${escapeHtml(player.connectionId)}"
-        ${selectedRecipients.has(player.connectionId) ? "checked" : ""}>
+      <input type="checkbox" data-player="${escapeHtml(player.connectionId)}" ${selectedRecipients.has(player.connectionId) ? "checked" : ""}>
       <span>${escapeHtml(player.name)}</span>
       <small>${player.role === "GM" ? "Майстер" : "Гравець"}</small>
     </label>
   `).join("") : `<div class="empty">Учасників не знайдено. Перевір кімнату.</div>`;
-  render();
 }
 
 function resetEditor(): void {
@@ -375,7 +375,7 @@ app.addEventListener("change", (event) => {
   if (!id) return;
   if (input.checked) selectedRecipients.add(id);
   else selectedRecipients.delete(id);
-  render();
+  renderPlayers();
 });
 
 app.addEventListener("click", (event) => { if (!(event.target as HTMLElement).closest("#select-all")) return;
@@ -474,42 +474,25 @@ fileInput.addEventListener("change", async () => {
   }
 });
 
-$("#show").addEventListener("click", async () => {
-  const image = getSelected();
-  const recipients = [...selectedRecipients];
-  if (!image || recipients.length === 0) {
-    status.textContent = "Спочатку обери зображення та хоча б одного гравця.";
+app.addEventListener("click", async (event) => {
+  const target = event.target as HTMLElement;
+  if (target.closest("#show")) {
+    const image = getSelected();
+    const recipients = [...selectedRecipients];
+    if (!image || recipients.length === 0) { status.textContent = "Спочатку обери зображення та хоча б одного гравця."; return; }
+    try {
+      await OBR.broadcast.sendMessage(CHANNEL, { type: "SHOW", image, recipients }, { destination: "ALL" });
+      status.textContent = `Команду показу надіслано. Одержувачів: ${recipients.length}.`;
+    } catch (error) { console.error(error); status.textContent = `Не вдалося надіслати команду показу: ${error instanceof Error ? error.message : JSON.stringify(error)}`; }
     return;
   }
-
-  try {
-    await OBR.broadcast.sendMessage(CHANNEL, {
-      type: "SHOW",
-      image,
-      recipients
-    }, { destination: "ALL" });
-    status.textContent = `Команду показу надіслано. Одержувачів: ${recipients.length}.`;
-  } catch (error) {
-    console.error(error);
-    status.textContent = "Не вдалося надіслати команду показу.";
-  }
-});
-
-$("#hide").addEventListener("click", async () => {
-  const recipients = [...selectedRecipients];
-  if (!recipients.length) {
-    status.textContent = "Обери учасників, у яких потрібно приховати зображення.";
-    return;
-  }
-  try {
-    await OBR.broadcast.sendMessage(CHANNEL, {
-      type: "HIDE",
-      recipients
-    }, { destination: "ALL" });
-    status.textContent = "Команду приховування надіслано.";
-  } catch (error) {
-    console.error(error);
-    status.textContent = "Не вдалося надіслати команду приховування.";
+  if (target.closest("#hide")) {
+    const recipients = [...selectedRecipients];
+    if (!recipients.length) { status.textContent = "Обери учасників, у яких потрібно приховати зображення."; return; }
+    try {
+      await OBR.broadcast.sendMessage(CHANNEL, { type: "HIDE", recipients }, { destination: "ALL" });
+      status.textContent = "Команду приховування надіслано.";
+    } catch (error) { console.error(error); status.textContent = `Не вдалося надіслати команду приховування: ${error instanceof Error ? error.message : JSON.stringify(error)}`; }
   }
 });
 
