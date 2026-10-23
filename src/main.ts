@@ -402,7 +402,7 @@ app.addEventListener("click", (event) => { if (!(event.target as HTMLElement).cl
 $("#choose-asset").addEventListener("click", async () => {
   try {
     status.textContent = "Відкриваю вікно вибору зображень Owlbear Rodeo…";
-    const assets = await OBR.assets.downloadImages(true, "*");
+    const assets = await OBR.assets.downloadImages(true, " ");
     if (!assets || assets.length === 0) {
       status.textContent = "Імпорт скасовано або зображення не вибрано.";
       return;
@@ -430,7 +430,9 @@ $("#choose-asset").addEventListener("click", async () => {
     selectedId = imported[0].id;
     await persistCatalog();
     render();
-    status.textContent = `Імпортовано ${imported.length} зображень з Asset Manager.`;
+    // Відразу відкриваємо повну форму редагування першого імпортованого зображення.
+    editImage(imported[0].id);
+    status.textContent = `Імпортовано ${imported.length} зображень. Можна одразу редагувати назву, URL, опис і папку першого зображення.`;
   } catch (error) {
     console.error("Asset Manager import failed:", error);
     status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : (() => { try { return JSON.stringify(error); } catch { return String(error); } })()}`;
