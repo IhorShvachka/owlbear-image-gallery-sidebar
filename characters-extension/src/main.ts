@@ -16,6 +16,7 @@ type CharacterRecord = {
 };
 type CharacterStore = { characters: CharacterRecord[] };
 type TokenSummary = { id: string; name: string; type: string };
+type RoomPlayer = { id: string; name: string; role: "GM" | "PLAYER" };
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
@@ -29,8 +30,7 @@ app.innerHTML = `
     <p class="hint">Вибери токен на поточній карті та признач власника. Позначені копії одного персонажа на активній карті синхронізуються без перенесення позиції, повороту й масштабу.</p>
     <label>Токен на поточній карті<select id="token"><option value="">Завантаження токенів…</option></select></label>
     <label>Ім’я персонажа<input id="character-name" maxlength="100" placeholder="Наприклад, Елара"></label>
-    <label>Ім’я гравця<input id="owner-name" maxlength="100" placeholder="Ім’я гравця в кімнаті"></label>
-    <label>ID гравця (необов’язково)<input id="owner-id" maxlength="160" placeholder="Для точного зіставлення користувача"></label>
+    <label>Власник персонажа<select id="owner-player"><option value="">Не призначено</option></select></label>
     <button id="assign">Зберегти шаблон і прив’язати токен</button>
     <button id="reload" class="secondary">Оновити список токенів</button>
     <div id="status" role="status" class="status">Підключення до Owlbear Rodeo…</div>
@@ -44,12 +44,12 @@ app.innerHTML = `
 
 const tokenSelect = app.querySelector<HTMLSelectElement>("#token")!;
 const nameInput = app.querySelector<HTMLInputElement>("#character-name")!;
-const ownerInput = app.querySelector<HTMLInputElement>("#owner-name")!;
-const ownerIdInput = app.querySelector<HTMLInputElement>("#owner-id")!;
+const ownerSelect = app.querySelector<HTMLSelectElement>("#owner-player")!;
 const status = app.querySelector<HTMLDivElement>("#status")!;
 const charactersEl = app.querySelector<HTMLDivElement>("#characters")!;
 
 let tokens: TokenSummary[] = [];
+let roomPlayers: RoomPlayer[] = [];
 let store: CharacterStore = { characters: [] };
 let ready = false;
 let syncing = false;
@@ -95,6 +95,29 @@ async function loadStore(): Promise<void> {
 
 async function saveStore(): Promise<void> {
   await OBR.room.setMetadata({ [ROOM_KEY]: store });
+}
+
+async function loadPlayers(): Promise<void> {
+  try {
+    const players = await OBR.party.getPlayers();
+    roomPlayers = players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      role: player.role
+    })).sort((a, b) => {
+      if (a.role !== b.role) return a.role === "GM" ? -1 : 1;
+      return a.name.localeCompare(b.name, "uk");
+    });
+
+    const previous = ownerSelect.value;
+    ownerSelect.innerHTML = '<option value="">Не призначено</option>' + roomPlayers
+      .map((player) => `<option value="${safe(player.id)}">${safe(player.name)}${player.role === "GM" ? " · ведучий" : ""}</option>`)
+      .join("");
+    if (roomPlayers.some((player) => player.id === previous)) ownerSelect.value = previous;
+  } catch (error) {
+    console.error("Could not load room players", error);
+    message("Не вдалося завантажити список гравців кімнати.");
+  }
 }
 
 async function loadTokens(): Promise<void> {
@@ -251,8 +274,9 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
     return;
   }
   const name = nameInput.value.trim() || token.name;
-  const ownerName = ownerInput.value.trim();
-  const ownerId = ownerIdInput.value.trim();
+  const owner = roomPlayers.find((player) => player.id === ownerSelect.value);
+  const ownerName = owner?.name ?? "";
+  const ownerId = owner?.id ?? "";
 
   try {
     const items = await OBR.scene.items.getItems([token.id]);
@@ -311,6 +335,7 @@ OBR.onReady(async () => {
   try {
     await loadStore();
     await loadTokens();
+    await loadPlayers();
     ready = true;
     message("Підключено. Початковий модуль шаблонів активний.");
     const initialItems = await OBR.scene.items.getItems();
@@ -329,6 +354,7 @@ OBR.onReady(async () => {
     OBR.room.onMetadataChange(() => {
       void loadStore().then(() => reconcileActiveScene());
     });
+    OBR.party.onChange(() => void loadPlayers());
   } catch (error) {
     console.error("Characters extension initialization failed", error);
     message("Не вдалося ініціалізувати розширення в цій кімнаті.");
