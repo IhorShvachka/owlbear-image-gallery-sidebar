@@ -437,53 +437,7 @@ $("#choose-asset").addEventListener("click", async () => {
   }
 });
 
-/*
-fileInput.addEventListener("change", async () => {
-  const files = Array.from(fileInput.files ?? []);
-  if (!files.length) return;
 
-  try {
-    await OBR.assets.uploadImages(files.map((file) => ({
-      file,
-      name: file.name.replace(/\.[^.]+$/, ""),
-      text: {
-        richText: [],
-        plainText: "",
-        type: "PLAIN" as const,
-        width: "AUTO" as const,
-        height: "AUTO" as const,
-        style: {
-          fillColor: "#ffffff",
-          fillOpacity: 1,
-          strokeColor: "#000000",
-          strokeOpacity: 1,
-          strokeWidth: 0,
-          textAlign: "CENTER" as const,
-          textAlignVertical: "MIDDLE" as const,
-          fontFamily: "Arial",
-          fontSize: 16,
-          fontWeight: 400,
-          lineHeight: 1,
-          padding: 0
-        }
-      },
-      textItemType: "LABEL" as const,
-      grid: { offset: { x: 0, y: 0 }, dpi: 1 },
-      visible: true,
-      locked: false,
-      rotation: 0,
-      scale: { x: 1, y: 1 },
-      description: ""
-    })), "PROP");
-
-    status.textContent = `Файли завантажено в Asset Manager (${files.length}). Натисни «Імпортувати з Asset Manager» і вибери їх зі списку.`;
-  } catch (error) {
-    console.error(error);
-    status.textContent = "Не вдалося імпортувати файли. Перевір формат і права доступу.";
-  } finally {
-    fileInput.value = "";
-  }
-});*/
 
 app.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
