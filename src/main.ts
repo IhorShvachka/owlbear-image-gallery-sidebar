@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <span class="header-version">v0.3.4</span><span class="header-icon" aria-hidden="true">▧</span>
+    <span class="header-version">v0.3.5</span><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
@@ -37,7 +37,6 @@ app.innerHTML = `
   <section class="folder-manager">
     <div class="section-row"><span>ПАПКИ</span><span id="folder-location" class="folder-location">Коренева папка</span></div>
     <div id="folder-breadcrumbs" class="folder-breadcrumbs"></div>
-    <div id="folder-grid" class="folder-grid"></div>
     <div class="folder-create"><input id="new-folder" maxlength="60" placeholder="Назва нової папки"><button id="create-folder" class="secondary">＋ Створити папку</button><button id="delete-folder" class="secondary danger">Видалити</button></div>
   </section>
   <div class="section-row"><span>КАТАЛОГ</span><span id="count" class="count"></span></div>
@@ -61,15 +60,6 @@ app.innerHTML = `
     </div>
   </section>
 
-  <section id="share-controls" class="share-controls" hidden>
-    <div class="section-row"><span>ПОКАЗАТИ ГРАВЦЯМ</span><button id="refresh-players" class="text-button">Оновити список</button></div>
-    <section class="recipients">
-      <div id="player-list" class="player-list">Завантаження учасників…</div>
-      <div class="actions"><button id="select-all" class="secondary">Обрати всіх</button><button id="select-none" class="secondary">Зняти вибір</button></div>
-    </section>
-    <div class="actions"><button id="show" class="primary">↗ Показати обраним</button><button id="hide" class="secondary">Приховати</button></div>
-  </section>
-
   <div id="status" class="status" role="status">Очікування підключення до Owlbear Rodeo…</div>
   <footer>Зображення відкриваються у вікні учасника й не додаються на ігрову карту.</footer>
 `;
@@ -86,7 +76,6 @@ const descriptionInput = $<HTMLTextAreaElement>("#description-input");
 const folderInput = $<HTMLSelectElement>("#image-folder");
 const folderLocation = $("#folder-location");
 const folderBreadcrumbs = $("#folder-breadcrumbs");
-const folderGrid = $("#folder-grid");
 const newFolderInput = $<HTMLInputElement>("#new-folder");
 const playerList = $("#player-list");
 const saveButton = $("#save-image");
@@ -131,12 +120,6 @@ function renderFolders(): void {
   folderBreadcrumbs.innerHTML = crumbs.join("");
   const prefix = selectedFolder ? selectedFolder + "/" : "";
   const childFolders = [...new Set(folders.filter((folder) => folder.startsWith(prefix) && folder !== selectedFolder).map((folder) => folder.slice(prefix.length).split("/")[0]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uk"));
-  folderGrid.innerHTML = childFolders.length ? childFolders.map((name) => {
-    const path = prefix + name;
-    const total = catalog.filter((image) => (image.folder ?? "") === path || (image.folder ?? "").startsWith(path + "/")).length;
-    const nested = folders.some((folder) => folder.startsWith(path + "/"));
-    return `<button class="folder-card" data-open-folder="${escapeHtml(path)}"><span class="folder-art">📁</span><span class="folder-card-name">${escapeHtml(name)}</span><small>${total} зображень${nested ? " · є підпапки" : ""}</small></button>`;
-  }).join("") : `<div class="folder-empty">Немає підпапок. Створи папку тут або додай зображення нижче.</div>`;
   const currentFolder = folderInput.value;
   folderInput.innerHTML = ['<option value="">Без папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder.split("/").join(" / "))}</option>`)].join("");
   if (folders.includes(currentFolder)) folderInput.value = currentFolder;
@@ -144,35 +127,35 @@ function renderFolders(): void {
 function render(): void {
   renderFolders();
   const images = filteredImages();
-  count.textContent = `${images.length} / ${catalog.length}`;
-
-  if (images.length && !images.some((image) => image.id === selectedId)) {
-    selectedId = images[0].id;
-  }
-
-  gallery.innerHTML = images.length ? images.map((image) => `
-    <div class="gallery-item">
-      <button class="tile ${image.id === selectedId ? "selected" : ""}" data-id="${escapeHtml(image.id)}" aria-pressed="${image.id === selectedId}">
+  count.textContent = `${images.length} зображень`;
+  if (selectedId && !images.some((image) => image.id === selectedId)) selectedId = "";
+  const prefix = selectedFolder ? selectedFolder + "/" : "";
+  const childFolders = [...new Set(folders.filter((folder) => folder.startsWith(prefix) && folder !== selectedFolder).map((folder) => folder.slice(prefix.length).split("/")[0]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uk"));
+  const folderTiles = childFolders.map((name) => {
+    const path = prefix + name;
+    const total = catalog.filter((image) => (image.folder ?? "") === path || (image.folder ?? "").startsWith(path + "/")).length;
+    return `<button class="folder-card folder-inline" data-open-folder="${escapeHtml(path)}"><span class="folder-art">📁</span><span class="folder-card-name">${escapeHtml(name)}</span><small>${total} зображень</small></button>`;
+  }).join("");
+  const imageTiles = images.map((image) => {
+    const isSelected = image.id === selectedId;
+    return `<div class="gallery-item ${isSelected ? "is-selected" : ""}">
+      <button class="tile ${isSelected ? "selected" : ""}" data-id="${escapeHtml(image.id)}" aria-pressed="${isSelected}">
         <img src="${escapeHtml(image.url)}" alt="" loading="lazy">
         <span class="tile-title">${escapeHtml(image.title)}</span>
-        <span class="tile-category">${image.folder ? "📁 " + escapeHtml(image.folder.split("/").slice(-1)[0]) : "Без папки"}</span>
       </button>
       <button class="info-button" data-info="${escapeHtml(image.id)}" aria-label="Показати опис" title="Показати опис">i</button>
-      <div class="tile-tools">
-        <button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button>
-        <button data-delete="${escapeHtml(image.id)}" class="text-button danger">Видалити</button>
-      </div>
-    </div>
-  `).join("") : `<div class="empty">Нічого не знайдено.</div>`;
-
-  const image = getSelected();
-  const selectedIsVisible = !!image && images.some((item) => item.id === image.id);
+      <div class="tile-tools"><button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button><button data-delete="${escapeHtml(image.id)}" class="text-button danger">Видалити</button></div>
+      ${isSelected ? `<div class="image-share-panel"><div class="share-heading">ПОКАЗАТИ ГРАВЦЯМ <button id="refresh-players" class="text-button">Оновити</button></div><div id="player-list" class="player-list">Завантаження учасників…</div><div class="actions"><button id="select-all" class="secondary">Усі гравці</button><button id="select-none" class="secondary">Очистити</button></div><div class="actions"><button id="show" class="primary">↗ Показати</button><button id="hide" class="secondary">Приховати</button></div></div>` : ""}
+    </div>`;
+  }).join("");
+  gallery.innerHTML = (folderTiles + imageTiles) || `<div class="empty">У цій папці поки немає папок або зображень.</div>`;
   preview.hidden = true;
-  preview.innerHTML = image && selectedIsVisible
-    ? `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}"><div class="preview-copy"><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description || "Опис відсутній.")}</span></div>`
-    : "";
-  $("#share-controls").hidden = !selectedIsVisible;
-  $("#show").toggleAttribute("disabled", !selectedIsVisible || selectedRecipients.size === 0);
+  preview.innerHTML = "";
+  const oldPopup = gallery.querySelector(".info-popover");
+  if (oldPopup) oldPopup.remove();
+  const selectedIsVisible = !!selectedId && images.some((image) => image.id === selectedId);
+  const showButton = $("#show");
+  if (showButton) showButton.toggleAttribute("disabled", !selectedIsVisible || selectedRecipients.size === 0);
 }
 
 function renderPlayers(): void {
@@ -236,52 +219,51 @@ async function refreshPlayers(): Promise<void> {
 
 gallery.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
+  const info = target.closest<HTMLButtonElement>("[data-info]");
   const edit = target.closest<HTMLButtonElement>("[data-edit]");
   const del = target.closest<HTMLButtonElement>("[data-delete]");
   const tile = target.closest<HTMLButtonElement>("[data-id]");
-  const info = target.closest<HTMLButtonElement>("[data-info]");
-
+  const folderButton = target.closest<HTMLButtonElement>("[data-open-folder]");
   if (info?.dataset.info) {
-    const image = catalog.find((item) => item.id === info.dataset.info);
-    if (image) {
-      selectedId = image.id;
-      preview.hidden = false;
-      preview.innerHTML = `<img class="preview-image" src="${escapeHtml(image.url)}" alt="${escapeHtml(image.title)}"><div class="preview-copy"><strong>${escapeHtml(image.title)}</strong><span>${escapeHtml(image.description || "Опис відсутній.")}</span></div>`;
-      $("#share-controls").hidden = false;
-      $("#show").toggleAttribute("disabled", selectedRecipients.size === 0);
+    const item = info.closest<HTMLElement>(".gallery-item");
+    const existing = item?.querySelector(".info-popover");
+    gallery.querySelectorAll(".info-popover").forEach((el) => el.remove());
+    if (existing) return;
+    const image = catalog.find((entry) => entry.id === info.dataset.info);
+    if (item && image) {
+      const popup = document.createElement("div");
+      popup.className = "info-popover";
+      popup.innerHTML = `<strong>${escapeHtml(image.title)}</strong><p>${escapeHtml(image.description || "Опис відсутній.")}</p>`;
+      item.appendChild(popup);
     }
     return;
   }
-
-  if (edit?.dataset.edit) {
-    editImage(edit.dataset.edit);
-    return;
-  }
-
+  gallery.querySelectorAll(".info-popover").forEach((el) => el.remove());
+  if (folderButton?.dataset.openFolder) { selectedFolder = folderButton.dataset.openFolder; selectedId = ""; render(); return; }
+  if (edit?.dataset.edit) { editImage(edit.dataset.edit); return; }
   if (del?.dataset.delete) {
     const image = catalog.find((item) => item.id === del.dataset.delete);
     if (!image || !confirm(`Видалити «${image.title}» з каталогу?`)) return;
     catalog = catalog.filter((item) => item.id !== image.id);
-    if (selectedId === image.id) selectedId = catalog[0]?.id ?? "";
+    if (selectedId === image.id) selectedId = "";
     if (editingId === image.id) resetEditor();
-    try {
-      await persistCatalog();
-      render();
-      status.textContent = "Зображення видалено.";
-    } catch (error) {
-      console.error(error);
-      status.textContent = "Не вдалося зберегти зміни каталогу.";
-    }
+    try { await persistCatalog(); render(); status.textContent = "Зображення видалено."; }
+    catch (error) { console.error(error); status.textContent = "Не вдалося зберегти зміни каталогу."; }
     return;
   }
-
   if (tile?.dataset.id) {
-    selectedId = tile.dataset.id;
+    selectedId = selectedId === tile.dataset.id ? "" : tile.dataset.id;
     render();
-    $("#share-controls").hidden = false;
+    if (selectedId) renderPlayers();
   }
 });
 
+// Закриваємо віконце опису при будь-якому натисканні поза кнопкою «i».
+document.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  if (target.closest("[data-info]") || target.closest(".info-popover")) return;
+  gallery.querySelectorAll(".info-popover").forEach((el) => el.remove());
+});
 searchInput.addEventListener("input", () => {
   query = searchInput.value;
   render();
@@ -294,12 +276,7 @@ folderBreadcrumbs.addEventListener("click", (event) => {
   selectedFolder = button.dataset.path ?? "";
   render();
 });
-folderGrid.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-open-folder]");
-  if (!button?.dataset.openFolder) return;
-  selectedFolder = button.dataset.openFolder;
-  render();
-});
+
 $("#delete-folder").addEventListener("click", async () => {
   const target = selectedFolder;
   if (!target || !folders.includes(target)) {
@@ -391,8 +368,8 @@ saveButton.addEventListener("click", async () => {
 
 cancelButton.addEventListener("click", resetEditor);
 
-$("#refresh-players").addEventListener("click", refreshPlayers);
-playerList.addEventListener("change", (event) => {
+app.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#refresh-players")) void refreshPlayers(); });
+app.addEventListener("change", (event) => {
   const input = event.target as HTMLInputElement;
   const id = input.dataset.player;
   if (!id) return;
@@ -401,11 +378,11 @@ playerList.addEventListener("change", (event) => {
   render();
 });
 
-$("#select-all").addEventListener("click", () => {
+app.addEventListener("click", (event) => { if (!(event.target as HTMLElement).closest("#select-all")) return;
   selectedRecipients = new Set(players.filter((player) => player.role === "PLAYER").map((player) => player.connectionId));
   renderPlayers();
 });
-$("#select-none").addEventListener("click", () => {
+app.addEventListener("click", (event) => { if (!(event.target as HTMLElement).closest("#select-none")) return;
   selectedRecipients.clear();
   renderPlayers();
 });
@@ -413,7 +390,7 @@ $("#select-none").addEventListener("click", () => {
 $("#choose-asset").addEventListener("click", async () => {
   try {
     status.textContent = "Відкриваю вікно вибору зображень Owlbear Rodeo…";
-    const assets = await OBR.assets.downloadImages(true, "", "PROP");
+    const assets = await OBR.assets.downloadImages(true, "");
     if (!assets || assets.length === 0) {
       status.textContent = "Імпорт скасовано або зображення не вибрано.";
       return;
@@ -445,7 +422,7 @@ $("#choose-asset").addEventListener("click", async () => {
     status.textContent = `Імпортовано ${imported.length} зображень з Asset Manager.`;
   } catch (error) {
     console.error("Asset Manager import failed:", error);
-    status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : String(error)}`;
+    status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : (() => { try { return JSON.stringify(error); } catch { return String(error); } })()}`;
   }
 });
 $("#upload-local").addEventListener("click", () => fileInput.click());
