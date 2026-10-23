@@ -3,7 +3,7 @@ import "./style.css";
 
 const EXTENSION_ID = "com.ihorshvachka.characters";
 const ROOM_KEY = `${EXTENSION_ID}.characters.v1`;
-const TOKEN_KEY = `${EXTENSION_ID}.token`;
+const TOKEN_KEY = `${EXTENSION_ID}.characterId`;
 
 type CharacterRecord = {
   id: string;
@@ -27,7 +27,7 @@ app.innerHTML = `
   </header>
   <section class="panel">
     <div class="section-title">ПРИЗНАЧИТИ ПЕРСОНАЖА</div>
-    <p class="hint">Вибери токен на поточній карті, потім вкажи гравця. Цей початковий модуль поки створює запис шаблону; автоматичне оновлення копій буде наступним етапом.</p>
+    <p class="hint">Вибери токен на поточній карті та признач власника. Збережені токени з одним шаблоном синхронізуються в межах активної карти; координати, поворот і масштаб не копіюються.</p>
     <label>Токен на поточній карті<select id="token"><option value="">Завантаження токенів…</option></select></label>
     <label>Ім’я персонажа<input id="character-name" maxlength="100" placeholder="Наприклад, Елара"></label>
     <label>Ім’я гравця<input id="owner-name" maxlength="100" placeholder="Ім’я гравця в кімнаті"></label>
@@ -40,7 +40,7 @@ app.innerHTML = `
     <div class="section-title">ЗБЕРЕЖЕНІ ШАБЛОНИ</div>
     <div id="characters" class="characters"><p class="muted">Завантаження…</p></div>
   </section>
-  <footer>Розташування токенів не є частиною шаблону. Повна синхронізація копій і контроль прав ще в розробці.</footer>
+  <footer>Розташування токенів не є частиною шаблону. Синхронізація між різними сценами та надійне обмеження прав потребують окремої реалізації й перевірки.</footer>
 `;
 
 const tokenSelect = app.querySelector<HTMLSelectElement>("#token")!;
@@ -52,7 +52,7 @@ const charactersEl = app.querySelector<HTMLDivElement>("#characters")!;
 
 let tokens: TokenSummary[] = [];
 let store: CharacterStore = { characters: [] };
-let ready = false;
+let ready = false;\nlet syncing = false;\nlet lastSnapshot = new Map<string, string>();\nconst TRANSFORM_FIELDS = new Set(["id", "position", "rotation", "scale", "lastModified", "lastModifiedUserId", "createdUserId", "metadata"]);\n\nfunction syncableProperties(item: Record<string, any>): Record<string, unknown> {\n  const result: Record<string, unknown> = {};\n  for (const [key, value] of Object.entries(item)) {\n    if (TRANSFORM_FIELDS.has(key)) continue;\n    result[key] = value;\n  }\n  return result;\n}\n\nfunction stable(value: unknown): string {\n  try { return JSON.stringify(value, Object.keys((value && typeof value === "object") ? value as object : {}).sort()); } catch { return String(value); }\n}\n\nasync function handleSceneItems(items: any[]): Promise<void> {\n  if (!ready || syncing) return;\n  const linked = items.filter((item) => item?.metadata?.[TOKEN_KEY]);\n  if (!linked.length) return;\n  syncing = true;\n  try {\n    let changed = false;\n    for (const item of linked) {\n      const characterId = String(item.metadata[TOKEN_KEY]);\n      const record = store.characters.find((entry) => entry.id === characterId);\n      if (!record) continue;\n      const props = syncableProperties(item);\n      const fingerprint = JSON.stringify(props);\n      const previous = lastSnapshot.get(item.id);\n      lastSnapshot.set(item.id, fingerprint);\n      if (previous === undefined || previous === fingerprint) continue;\n      record.properties = props;\n      record.tokenName = item.name || record.tokenName;\n      record.updatedAt = Date.now();\n      changed = true;\n      const peers = linked.filter((other) => other.id !== item.id && String(other.metadata[TOKEN_KEY]) === characterId);\n      for (const peer of peers) {\n        await OBR.scene.items.updateItems([peer.id], (draft) => {\n          for (const target of draft) {\n            for (const [key, value] of Object.entries(props)) {\n              (target as any)[key] = value;\n            }\n          }\n        });\n      }\n    }\n    if (changed) await saveStore();\n  } catch (error) {\n    console.error("Character sync failed", error);\n  } finally {\n    syncing = false;\n  }\n}
 
 function message(text: string): void {
   status.textContent = text;
@@ -151,7 +151,7 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
     store.characters = [...store.characters.filter((character) => character.id !== record.id), record];
     await saveStore();
     renderCharacters();
-    message(`Шаблон «${name}» збережено в метаданих кімнати. Автоматична синхронізація копій ще не ввімкнена.`);
+    message(`Шаблон «${name}» збережено в метаданих кімнати. Зміни шаблону відстежуються для позначених копій на активній карті. Для синхронізації між різними картами потрібен окремий етап.`);
   } catch (error) {
     console.error("Could not save character template", error);
     message("Не вдалося зберегти шаблон. Перевір консоль Owlbear для деталей.");
@@ -179,7 +179,7 @@ OBR.onReady(async () => {
     await loadTokens();
     ready = true;
     message("Підключено. Це початковий модуль шаблонів.");
-    OBR.scene.items.onChange(() => void loadTokens());
+    OBR.scene.items.onChange((items) => { void loadTokens(); void handleSceneItems(items as any[]); });
     OBR.room.onMetadataChange(() => void loadStore());
   } catch (error) {
     console.error("Characters extension initialization failed", error);
