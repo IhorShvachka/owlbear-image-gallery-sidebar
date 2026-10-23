@@ -26,7 +26,7 @@ app.innerHTML = `
       <h1>Галерея зображень</h1>
       <p class="subhead">Каталог ілюстрацій для твоєї пригоди.</p>
     </div>
-    <span class="header-version">v0.3.6</span><span class="header-icon" aria-hidden="true">▧</span>
+    <span class="header-version">v0.3.7</span><span class="header-icon" aria-hidden="true">▧</span>
   </header>
 
   <label class="search-wrap">
@@ -43,22 +43,17 @@ app.innerHTML = `
   <div id="gallery" class="gallery"></div>
   <section id="preview" class="preview" hidden></section>
 
-  <section class="editor">
-    <div class="section-row"><span id="editor-heading">ДОДАТИ ЗОБРАЖЕННЯ</span></div>
+  <div id="editor-overlay" class="editor-overlay" hidden><section class="editor editor-dialog">
+    <div class="editor-top"><div class="section-row"><span id="editor-heading">ДОДАТИ ЗОБРАЖЕННЯ ЗА ПОСИЛАННЯМ</span></div><button id="close-editor" class="close-editor" aria-label="Закрити">✕</button></div>
     <label class="field-label">Назва<input id="title-input" maxlength="100" placeholder="Наприклад, Таємничий храм"></label>
     <label class="field-label">URL зображення<input id="url-input" type="url" placeholder="https://…"></label>
     <label class="field-label">Опис (необов’язково)<textarea id="description-input" rows="2" maxlength="500" placeholder="Короткий опис"></textarea></label>
-    <label class="field-label">Папка<select id="image-folder"><option value="">Без папки</option></select></label>
+    <label class="field-label">Папка<select id="image-folder"><option value="">Поточна папка</option></select></label>
     <div class="actions">
       <button id="save-image" class="primary">Зберегти</button>
       <button id="cancel-edit" class="secondary" hidden>Скасувати</button>
     </div>
-    <div class="actions">
-      <button id="choose-asset" class="secondary">Імпортувати з Asset Manager</button>
-      <button id="upload-local" class="secondary">Імпортувати файл</button>
-      <input id="file-input" type="file" accept="image/*" multiple hidden>
-    </div>
-  </section>
+  </section></div>
 
   <div id="status" class="status" role="status">Очікування підключення до Owlbear Rodeo…</div>
   <footer>Зображення відкриваються у вікні учасника й не додаються на ігрову карту.</footer>
@@ -79,7 +74,7 @@ const folderBreadcrumbs = $("#folder-breadcrumbs");
 const newFolderInput = $<HTMLInputElement>("#new-folder");
 const saveButton = $("#save-image");
 const cancelButton = $("#cancel-edit");
-const fileInput = $<HTMLInputElement>("#file-input");
+const editorOverlay = $("#editor-overlay");
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -175,8 +170,9 @@ function resetEditor(): void {
   titleInput.value = "";
   urlInput.value = "";
   descriptionInput.value = "";
-  folderInput.value = "";
-  $("#editor-heading").textContent = "ДОДАТИ ЗОБРАЖЕННЯ";
+  folderInput.value = selectedFolder;
+  $("#editor-heading").textContent = "ДОДАТИ ЗОБРАЖЕННЯ ЗА ПОСИЛАННЯМ";
+  editorOverlay.hidden = true;
   saveButton.textContent = "Зберегти";
   cancelButton.hidden = true;
 }
@@ -185,6 +181,7 @@ function editImage(id: string): void {
   const image = catalog.find((item) => item.id === id);
   if (!image) return;
   editingId = id;
+  editorOverlay.hidden = false;
   titleInput.value = image.title;
   urlInput.value = image.url;
   descriptionInput.value = image.description ?? "";
@@ -327,7 +324,7 @@ saveButton.addEventListener("click", async () => {
   const title = titleInput.value.trim() || "Без назви";
   const url = urlInput.value.trim();
   const description = descriptionInput.value.trim();
-  const folder = folderInput.value;
+  const folder = folderInput.value || selectedFolder;
 
   if (!url) {
     status.textContent = "Додай URL зображення або імпортуй його з Asset Manager.";
@@ -367,6 +364,21 @@ saveButton.addEventListener("click", async () => {
 });
 
 cancelButton.addEventListener("click", resetEditor);
+$("#open-editor").addEventListener("click", () => {
+  resetEditor();
+  folderInput.value = selectedFolder;
+  editorOverlay.hidden = false;
+  titleInput.focus();
+});
+$("#close-editor").addEventListener("click", () => { editorOverlay.hidden = true; });
+editorOverlay.addEventListener("click", (event) => {
+  if (event.target === editorOverlay) editorOverlay.hidden = true;
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") editorOverlay.hidden = true;
+});
+
+
 
 app.addEventListener("click", (event) => { if ((event.target as HTMLElement).closest("#refresh-players")) void refreshPlayers(); });
 app.addEventListener("change", (event) => {
@@ -390,7 +402,7 @@ app.addEventListener("click", (event) => { if (!(event.target as HTMLElement).cl
 $("#choose-asset").addEventListener("click", async () => {
   try {
     status.textContent = "Відкриваю вікно вибору зображень Owlbear Rodeo…";
-    const assets = await OBR.assets.downloadImages(true, "");
+    const assets = await OBR.assets.downloadImages(true, "*");
     if (!assets || assets.length === 0) {
       status.textContent = "Імпорт скасовано або зображення не вибрано.";
       return;
@@ -418,15 +430,14 @@ $("#choose-asset").addEventListener("click", async () => {
     selectedId = imported[0].id;
     await persistCatalog();
     render();
-    $("#share-controls").hidden = false;
     status.textContent = `Імпортовано ${imported.length} зображень з Asset Manager.`;
   } catch (error) {
     console.error("Asset Manager import failed:", error);
     status.textContent = `Помилка імпорту: ${error instanceof Error ? error.message : (() => { try { return JSON.stringify(error); } catch { return String(error); } })()}`;
   }
 });
-$("#upload-local").addEventListener("click", () => fileInput.click());
-
+/* Local file upload removed; import through Owlbear Asset Manager. */
+/*
 fileInput.addEventListener("change", async () => {
   const files = Array.from(fileInput.files ?? []);
   if (!files.length) return;
@@ -472,7 +483,7 @@ fileInput.addEventListener("change", async () => {
   } finally {
     fileInput.value = "";
   }
-});
+});*/
 
 app.addEventListener("click", async (event) => {
   const target = event.target as HTMLElement;
