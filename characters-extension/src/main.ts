@@ -33,7 +33,7 @@ app.innerHTML = `
     <label>Власник персонажа<select id="owner-player"><option value="">Не призначено</option></select></label>
     <button id="assign">Зберегти шаблон і прив’язати токен</button>
     <button id="reload" class="secondary">Оновити список токенів</button>
-    <div class="notice">Важливо: вибір гравця тут зберігається в шаблоні, але не змінює нативного власника токена Owlbear і не обмежує права керування. Для цього окремо ввімкни <strong>Character → Owner Only</strong> та признач власника засобами Owlbear.</div>
+    <div class="notice">Для обмеження керування гравцями ввімкни в Owlbear дозвіл <strong>Character → Owner Only</strong>. Розширення призначає власника вибраному токену й новим копіям, але права потрібно перевірити в кімнаті з кількома гравцями.</div>
     <div id="status" role="status" class="status">Підключення до Owlbear Rodeo…</div>
   </section>
   <section class="panel">
@@ -65,7 +65,6 @@ const SYNCABLE_FIELDS = new Set([
   "zIndex",
   "disableHit",
   "disableAutoZIndex",
-  "disableAttachmentBehavior",
   "description",
   "image",
   "grid",
@@ -302,6 +301,7 @@ async function createCharacterCopy(characterId: string): Promise<void> {
       .scale({ x: 1, y: 1 })
       .layer("CHARACTER")
       .metadata({ [TOKEN_KEY]: record.id });
+    if (record.ownerId) builder.createdUserId(record.ownerId);
 
     if (typeof props.visible === "boolean") builder.visible(props.visible);
     if (typeof props.locked === "boolean") builder.locked(props.locked);
@@ -313,9 +313,6 @@ async function createCharacterCopy(characterId: string): Promise<void> {
     }
     if (typeof props.disableHit === "boolean") builder.disableHit(props.disableHit);
     if (typeof props.disableAutoZIndex === "boolean") builder.disableAutoZIndex(props.disableAutoZIndex);
-    if (Array.isArray(props.disableAttachmentBehavior)) {
-      builder.disableAttachmentBehavior(props.disableAttachmentBehavior);
-    }
 
     await OBR.scene.items.addItems([builder.build()]);
     await loadTokens();
@@ -330,6 +327,10 @@ app.querySelector<HTMLButtonElement>("#reload")!.addEventListener("click", () =>
 
 app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async () => {
   if (!ready) return;
+  if (await OBR.player.getRole() !== "GM") {
+    message("Призначати персонажів може лише ведучий.");
+    return;
+  }
   const token = tokens.find((item) => item.id === tokenSelect.value);
   if (!token) {
     message("Спочатку вибери токен зі списку.");
@@ -353,6 +354,7 @@ app.querySelector<HTMLButtonElement>("#assign")!.addEventListener("click", async
     await OBR.scene.items.updateItems([selected.id], (draft) => {
       for (const target of draft) {
         target.metadata = { ...target.metadata, [TOKEN_KEY]: recordId };
+        if (ownerId) target.createdUserId = ownerId;
       }
     });
 
