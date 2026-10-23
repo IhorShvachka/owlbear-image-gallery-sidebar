@@ -12,7 +12,7 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 let catalog: GalleryImage[] = [...initialCatalog];
 let selectedId = catalog[0]?.id ?? "";
 let query = "";
-let selectedFolder = "Усі папки";
+let selectedFolder = "";
 let folders: string[] = [];
 let players: Recipient[] = [];
 let selectedRecipients = new Set<string>();
@@ -34,11 +34,12 @@ app.innerHTML = `
     <input id="search" type="search" placeholder="Пошук назви або опису…" autocomplete="off" />
   </label>
 
-  <div class="folder-controls">
-    <select id="folder-filter" aria-label="Фільтр папок"><option>Усі папки</option></select>
-    <input id="new-folder" maxlength="60" placeholder="Назва нової папки">
-    <button id="create-folder" class="secondary">Створити</button><button id="delete-folder" class="secondary danger">Видалити папку</button>
-  </div>
+  <section class="folder-manager">
+    <div class="section-row"><span>ПАПКИ</span><span id="folder-location" class="folder-location">Коренева папка</span></div>
+    <div id="folder-breadcrumbs" class="folder-breadcrumbs"></div>
+    <div id="folder-grid" class="folder-grid"></div>
+    <div class="folder-create"><input id="new-folder" maxlength="60" placeholder="Назва нової папки"><button id="create-folder" class="secondary">＋ Створити папку</button><button id="delete-folder" class="secondary danger">Видалити</button></div>
+  </section>
   <div class="section-row"><span>КАТАЛОГ</span><span id="count" class="count"></span></div>
   <div id="gallery" class="gallery"></div>
   <section id="preview" class="preview"></section>
@@ -87,7 +88,9 @@ const titleInput = $<HTMLInputElement>("#title-input");
 const urlInput = $<HTMLInputElement>("#url-input");
 const descriptionInput = $<HTMLTextAreaElement>("#description-input");
 const folderInput = $<HTMLSelectElement>("#image-folder");
-const folderFilter = $<HTMLSelectElement>("#folder-filter");
+const folderLocation = $("#folder-location");
+const folderBreadcrumbs = $("#folder-breadcrumbs");
+const folderGrid = $("#folder-grid");
 const newFolderInput = $<HTMLInputElement>("#new-folder");
 const playerList = $("#player-list");
 const saveButton = $("#save-image");
@@ -107,7 +110,7 @@ function getSelected(): GalleryImage | undefined {
 function filteredImages(): GalleryImage[] {
   const needle = query.trim().toLocaleLowerCase("uk");
   return catalog.filter((image) => {
-    const matchesFolder = selectedFolder === "Усі папки" || (image.folder ?? "") === selectedFolder || (image.folder ?? "").startsWith(selectedFolder + "/");
+    const matchesFolder = selectedFolder ? ((image.folder ?? "") === selectedFolder || (image.folder ?? "").startsWith(selectedFolder + "/")) : !(image.folder ?? "").includes("/");
     const matchesQuery = `${image.title} ${image.description ?? ""}`.toLocaleLowerCase("uk").includes(needle);
     return matchesFolder && matchesQuery;
   });
@@ -120,15 +123,28 @@ async function persistCatalog(): Promise<void> {
 
 function renderFolders(): void {
   folders = [...new Set([...folders, ...catalog.map((image) => image.folder).filter((folder): folder is string => !!folder)])].sort((a, b) => a.localeCompare(b, "uk"));
-  const currentFilter = selectedFolder;
-  folderFilter.innerHTML = ['<option value="Усі папки">Усі папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`)].join("");
-  folderFilter.value = folders.includes(currentFilter) || currentFilter === "Усі папки" ? currentFilter : "Усі папки";
-  if (folderFilter.value !== currentFilter) selectedFolder = folderFilter.value;
+  folderLocation.textContent = selectedFolder ? `Поточна папка: ${selectedFolder}` : "Коренева папка";
+  const crumbs = ['<button class="crumb" data-path="">🏠 Усі папки</button>'];
+  if (selectedFolder) {
+    let path = "";
+    for (const part of selectedFolder.split("/")) {
+      path = path ? `${path}/${part}` : part;
+      crumbs.push(`<span class="crumb-separator">›</span><button class="crumb" data-path="${escapeHtml(path)}">${escapeHtml(part)}</button>`);
+    }
+  }
+  folderBreadcrumbs.innerHTML = crumbs.join("");
+  const prefix = selectedFolder ? selectedFolder + "/" : "";
+  const childFolders = [...new Set(folders.filter((folder) => folder.startsWith(prefix) && folder !== selectedFolder).map((folder) => folder.slice(prefix.length).split("/")[0]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uk"));
+  folderGrid.innerHTML = childFolders.length ? childFolders.map((name) => {
+    const path = prefix + name;
+    const total = catalog.filter((image) => (image.folder ?? "") === path || (image.folder ?? "").startsWith(path + "/")).length;
+    const nested = folders.some((folder) => folder.startsWith(path + "/"));
+    return `<button class="folder-card" data-open-folder="${escapeHtml(path)}"><span class="folder-art">📁</span><span class="folder-card-name">${escapeHtml(name)}</span><small>${total} зображень${nested ? " · є підпапки" : ""}</small></button>`;
+  }).join("") : `<div class="folder-empty">Немає підпапок. Створи папку тут або додай зображення нижче.</div>`;
   const currentFolder = folderInput.value;
-  folderInput.innerHTML = ['<option value="">Без папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder)}</option>`)].join("");
+  folderInput.innerHTML = ['<option value="">Без папки</option>', ...folders.map((folder) => `<option value="${escapeHtml(folder)}">${escapeHtml(folder.split("/").join(" / "))}</option>`)].join("");
   if (folders.includes(currentFolder)) folderInput.value = currentFolder;
 }
-
 function render(): void {
   renderFolders();
   const images = filteredImages();
@@ -143,7 +159,7 @@ function render(): void {
       <button class="tile ${image.id === selectedId ? "selected" : ""}" data-id="${escapeHtml(image.id)}" aria-pressed="${image.id === selectedId}">
         <img src="${escapeHtml(image.url)}" alt="" loading="lazy">
         <span class="tile-title">${escapeHtml(image.title)}</span>
-        <span class="tile-category">${image.folder ? "📁 " + escapeHtml(image.folder) : "Без папки"}</span>
+        <span class="tile-category">${image.folder ? "📁 " + escapeHtml(image.folder.split("/").slice(-1)[0]) : "Без папки"}</span>
       </button>
       <div class="tile-tools">
         <button data-edit="${escapeHtml(image.id)}" class="text-button">Редагувати</button>
@@ -259,14 +275,22 @@ searchInput.addEventListener("input", () => {
   render();
 });
 
-folderFilter.addEventListener("change", () => {
-  selectedFolder = folderFilter.value;
+
+folderBreadcrumbs.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-path]");
+  if (!button) return;
+  selectedFolder = button.dataset.path ?? "";
   render();
 });
-
+folderGrid.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-open-folder]");
+  if (!button?.dataset.openFolder) return;
+  selectedFolder = button.dataset.openFolder;
+  render();
+});
 $("#delete-folder").addEventListener("click", async () => {
   const target = selectedFolder;
-  if (target === "Усі папки" || !folders.includes(target)) {
+  if (!target || !folders.includes(target)) {
     status.textContent = "Спочатку обери папку для видалення.";
     return;
   }
@@ -279,7 +303,7 @@ $("#delete-folder").addEventListener("click", async () => {
     const suffix = (image.folder ?? "").slice(target.length).replace(/^\/+/, "");
     return { ...image, folder: parent ? (suffix ? parent + "/" + suffix : parent) : (suffix || undefined) };
   });
-  selectedFolder = parent || "Усі папки";
+  selectedFolder = parent;
   try {
     await persistCatalog();
     render();
@@ -293,11 +317,12 @@ $("#delete-folder").addEventListener("click", async () => {
 $("#create-folder").addEventListener("click", () => {
   const name = newFolderInput.value.trim();
   if (!name) { status.textContent = "Введи назву папки."; return; }
-  if (folders.some((folder) => folder.toLocaleLowerCase("uk") === name.toLocaleLowerCase("uk"))) {
+  const path = selectedFolder ? `${selectedFolder}/${name}` : name;
+  if (folders.some((folder) => folder.toLocaleLowerCase("uk") === path.toLocaleLowerCase("uk"))) {
     status.textContent = "Папка з такою назвою вже існує."; return;
   }
-  folders.push(name);
-  selectedFolder = name;
+  folders.push(path);
+  selectedFolder = path;
   newFolderInput.value = "";
   render();
   folderInput.value = name;
